@@ -1,0 +1,46 @@
+[gd_scene format=3 uid="uid://b0t7w8j3k1q2c"]
+
+[ext_resource type="Script" uid="uid://biax656drt234" path="res://TreeGenerator3D.gd" id="1_a2b3c"]
+[ext_resource type="Script" uid="uid://csd7bj5vpwdg2" path="res://CameraController.gd" id="2_cmra1"]
+
+[sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_x1y2z"]
+sky_top_color = Color(0.384, 0.455, 0.549, 1)
+sky_horizon_color = Color(0.646, 0.656, 0.671, 1)
+ground_horizon_color = Color(0.646, 0.656, 0.671, 1)
+
+[sub_resource type="Sky" id="Sky_a1b2c"]
+sky_material = SubResource("ProceduralSkyMaterial_x1y2z")
+
+[sub_resource type="Environment" id="Environment_c2d3e"]
+background_mode = 2
+sky = SubResource("Sky_a1b2c")
+tonemap_mode = 2
+glow_enabled = true
+
+[node name="Main" type="Node3D" unique_id=1254776614]
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=363820896]
+transform = Transform3D(-0.866025, -0.433013, 0.25, 0, 0.5, 0.866025, -0.5, 0.75, -0.433013, 0, 0, 0)
+shadow_enabled = true
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=1004021759]
+environment = SubResource("Environment_c2d3e")
+
+[node name="Camera3D" type="Camera3D" parent="." unique_id=1090631737]
+transform = Transform3D(1, 0, 0, 0, 0.965926, 0.258819, 0, -0.258819, 0.965926, 0, 89, 65)
+script = ExtResource("2_cmra1")
+
+[node name="TreeGenerator3D" type="Node3D" parent="." unique_id=1877086732]
+script = ExtResource("1_a2b3c")
+segment_length = 1.5
+angle_deg = 15.0
+branch_thickness = 0.1
+thickness_taper = 0.03
+vertical_falloff = 1.2
+branch_length_scale = 1.0
+stiffness = 0.5
+damping = 0.1
+wind_strength = 2.0
+wind_scale = 2.0
+wind_speed = 2.0
+seed = 30
