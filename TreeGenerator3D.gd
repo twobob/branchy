@@ -59,6 +59,51 @@ func expand() -> String:
 		s = next
 	return s
 
+func validate_rule(rule: String) -> String:
+	var valid_chars = "FX+-[]"
+	var bracket_depth := 0
+	for i in range(rule.length()):
+		var c = rule[i]
+		if valid_chars.find(c) == -1:
+			return "Invalid char '%s' at pos %d" % [c, i]
+		if c == "[":
+			bracket_depth += 1
+		elif c == "]":
+			bracket_depth -= 1
+			if bracket_depth < 0:
+				return "Unmatched ']' at pos %d" % i
+	if bracket_depth != 0:
+		return "Unmatched '[' (%d unclosed)" % bracket_depth
+	if rule.length() == 0:
+		return "Rule cannot be empty"
+	return ""
+
+func randomize_rule_x() -> String:
+	var parts := []
+	var num_segments = rng.randi_range(3, 7)
+	for i in range(num_segments):
+		var r = rng.randf()
+		if r < 0.3:
+			parts.append("F")
+		elif r < 0.5:
+			# Branching with rotation
+			var sign = ["+", "-"][rng.randi_range(0, 1)]
+			var inner = ""
+			var inner_len = rng.randi_range(1, 3)
+			for j in range(inner_len):
+				inner += ["F", "X", sign][rng.randi_range(0, 2)]
+			parts.append("[" + sign + inner + "]")
+		elif r < 0.7:
+			parts.append(["+", "-"][rng.randi_range(0, 1)])
+		elif r < 0.85:
+			parts.append("X")
+		else:
+			# Nested branch
+			var sign1 = ["+", "-"][rng.randi_range(0, 1)]
+			var sign2 = ["+", "-"][rng.randi_range(0, 1)]
+			parts.append("[" + sign1 + "[X]" + sign2 + "X]")
+	return "".join(parts)
+
 # ---------------------------------------
 # GENERATION
 # ---------------------------------------

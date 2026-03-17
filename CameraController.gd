@@ -151,6 +151,51 @@ func _ready() -> void:
 	self_col_hbox.add_child(self_col_check)
 	self_col_check.toggled.connect(_on_self_col_toggled)
 	
+	# Rule X Editor
+	var rule_label = Label.new()
+	rule_label.text = "Rule X:"
+	panel.add_child(rule_label)
+	
+	var rule_hbox = HBoxContainer.new()
+	rule_hbox.name = "HBoxRULE"
+	panel.add_child(rule_hbox)
+	
+	var rule_edit = LineEdit.new()
+	rule_edit.name = "RuleXEdit"
+	rule_edit.custom_minimum_size = Vector2(200, 0)
+	rule_edit.focus_mode = Control.FOCUS_CLICK
+	if tree_gen:
+		rule_edit.text = tree_gen.rule_X
+	rule_hbox.add_child(rule_edit)
+	
+	var randomize_btn = Button.new()
+	randomize_btn.name = "RandomizeBtn"
+	randomize_btn.text = "Rand"
+	randomize_btn.focus_mode = Control.FOCUS_CLICK
+	rule_hbox.add_child(randomize_btn)
+	
+	var rule_status = Label.new()
+	rule_status.name = "RuleStatus"
+	rule_status.text = "✓ Valid"
+	rule_status.add_theme_color_override("font_color", Color.GREEN)
+	panel.add_child(rule_status)
+	
+	rule_edit.text_submitted.connect(func(new_text: String):
+		_apply_rule(new_text, rule_edit, rule_status)
+		rule_edit.release_focus()
+	)
+	
+	rule_edit.text_changed.connect(func(new_text: String):
+		_validate_rule_ui(new_text, rule_status)
+	)
+	
+	randomize_btn.pressed.connect(func():
+		if tree_gen:
+			var new_rule = tree_gen.randomize_rule_x()
+			rule_edit.text = new_rule
+			_apply_rule(new_rule, rule_edit, rule_status)
+	)
+
 	_add_slider(panel, "Iterations", "iterations", 1, 8, 1, tree_gen, true)
 	_add_slider(panel, "Segment Len", "segment_length", 0.1, 8.0, 0.1, tree_gen, true)
 	_add_slider(panel, "Branch Angle", "angle_deg", 5.0, 80.0, 1.0, tree_gen, true)
@@ -207,6 +252,32 @@ func _add_slider(panel: Control, label_text: String, prop_name: String, min_val:
 			if triggers_regen and tree_gen.has_method("regenerate_tree"):
 				tree_gen.regenerate_tree(tree_gen.seed)
 	)
+
+func _validate_rule_ui(rule_text: String, status_label: Label) -> void:
+	var tree_gen = get_node_or_null("../TreeGenerator3D")
+	if not tree_gen:
+		return
+	var err = tree_gen.validate_rule(rule_text)
+	if err == "":
+		status_label.text = "✓ Valid"
+		status_label.add_theme_color_override("font_color", Color.GREEN)
+	else:
+		status_label.text = "✗ " + err
+		status_label.add_theme_color_override("font_color", Color.RED)
+
+func _apply_rule(rule_text: String, rule_edit: LineEdit, status_label: Label) -> void:
+	var tree_gen = get_node_or_null("../TreeGenerator3D")
+	if not tree_gen:
+		return
+	var err = tree_gen.validate_rule(rule_text)
+	if err == "":
+		tree_gen.rule_X = rule_text
+		tree_gen.regenerate_tree(tree_gen.seed)
+		status_label.text = "✓ Valid"
+		status_label.add_theme_color_override("font_color", Color.GREEN)
+	else:
+		status_label.text = "✗ " + err
+		status_label.add_theme_color_override("font_color", Color.RED)
 
 func _on_self_col_toggled(toggled_on: bool) -> void:
 	var tree_gen = get_node_or_null("../TreeGenerator3D")
