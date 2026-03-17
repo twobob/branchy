@@ -34,9 +34,12 @@ class_name TreeGenerator3D
 
 var rng := RandomNumberGenerator.new()
 var branches: Array = []
+var debug_meshes: Array = []
+var show_debug: bool = true
 var time_accum := 0.0
 
 var tree_material: StandardMaterial3D
+var debug_material: StandardMaterial3D
 var wind_noise: FastNoiseLite
 
 # ---------------------------------------
@@ -64,6 +67,11 @@ func _ready():
 	tree_material.albedo_color = Color(0.2, 0.5, 0.2) # Green
 	tree_material.roughness = 0.9
 	
+	debug_material = StandardMaterial3D.new()
+	debug_material.albedo_color = Color(0.0, 1.0, 1.0, 0.3)
+	debug_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	debug_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	
 	wind_noise = FastNoiseLite.new()
 	wind_noise.noise_type = FastNoiseLite.TYPE_SIMPLEX
 	wind_noise.frequency = 0.015  # Much broader, swooping gusts
@@ -79,6 +87,7 @@ func regenerate_tree(new_seed: int):
 	for child in get_children():
 		child.queue_free()
 	branches.clear()
+	debug_meshes.clear()
 	time_accum = 0.0
 	
 	generate_tree()
@@ -188,9 +197,9 @@ func should_spawn_branch(h: float) -> bool:
 	# Increased branch chance slightly
 	return rng.randf() < (falloff * 2.0)
 
-# ---------------------------------------
+
 # BRANCH CREATION
-# ---------------------------------------
+
 
 func create_static_branch(path: Array, thicknesses: Array):
 	# Creates a static visual branch for the structural trunk lines
@@ -296,10 +305,54 @@ func create_branch(origin: Vector3, trunk_dir: Vector3, height_ratio: float, dyn
 		"anchor": anchor,
 		"tip": tip
 	})
+	
+	# Create debug visualization mesh matching the collision shape
+	var debug_vis = MeshInstance3D.new()
+	debug_vis.material_override = debug_material
+	debug_vis.visible = show_debug
+	
+	if collision_shape_type == 0: # Capsule
+		var cap_mesh = CapsuleMesh.new()
+		cap_mesh.radius = thick
+		cap_mesh.height = length + (thick * 2.0)
+		cap_mesh.rings = 4
+		cap_mesh.radial_segments = 8
+		debug_vis.mesh = cap_mesh
+		debug_vis.position = tip_col.position
+		debug_vis.basis = tip_col.basis
+	else: # Sphere
+		var sph_mesh = SphereMesh.new()
+		sph_mesh.radius = thick
+		sph_mesh.height = thick * 2.0
+		sph_mesh.rings = 8
+		sph_mesh.radial_segments = 12
+		debug_vis.mesh = sph_mesh
+	
+	tip.add_child(debug_vis)
+	debug_meshes.append(debug_vis)
+	
+	# Anchor debug sphere
+	var anchor_debug = MeshInstance3D.new()
+	var anc_mesh = SphereMesh.new()
+	anc_mesh.radius = thick
+	anc_mesh.height = thick * 2.0
+	anc_mesh.rings = 4
+	anc_mesh.radial_segments = 8
+	anchor_debug.mesh = anc_mesh
+	anchor_debug.material_override = debug_material
+	anchor_debug.visible = show_debug
+	anchor.add_child(anchor_debug)
+	debug_meshes.append(anchor_debug)
 
-# ---------------------------------------
+func set_debug_visible(on: bool) -> void:
+	show_debug = on
+	for m in debug_meshes:
+		if is_instance_valid(m):
+			m.visible = on
+
+
 # DYNAMIC VISUAL UPDATE
-# ---------------------------------------
+
 func _physics_process(delta):
 	time_accum += delta
 	for b in branches:
@@ -322,9 +375,9 @@ func apply_wind(b, delta):
 		wind *= capsule_wind_multiplier
 	tip.apply_central_force(wind)
 
-# ---------------------------------------
+
 # TUBE GENERATION
-# ---------------------------------------
+
 func generate_tube_array(path: Array, thicknesses: Array) -> ArrayMesh:
 	var st = SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)

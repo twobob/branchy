@@ -101,7 +101,10 @@ func _ready() -> void:
 	var debug_check = CheckBox.new()
 	debug_check.name = "CheckDEBUG"
 	debug_check.focus_mode = Control.FOCUS_CLICK
-	debug_check.button_pressed = get_tree().debug_collisions_hint
+	if tree_gen:
+		debug_check.button_pressed = tree_gen.show_debug
+	else:
+		debug_check.button_pressed = true
 	debug_hbox.add_child(debug_check)
 	
 	debug_check.toggled.connect(_on_debug_toggled)
@@ -218,12 +221,9 @@ func _on_shape_toggled(index: int) -> void:
 		tree_gen.regenerate_tree(tree_gen.seed)
 
 func _on_debug_toggled(toggled_on: bool) -> void:
-	get_tree().debug_collisions_hint = toggled_on
-	
-	# Godot requires physics shapes to completely respawn to actually draw their debug mesh
 	var tree_gen = get_node_or_null("../TreeGenerator3D")
-	if tree_gen and tree_gen.has_method("regenerate_tree"):
-		tree_gen.regenerate_tree(tree_gen.seed)
+	if tree_gen and tree_gen.has_method("set_debug_visible"):
+		tree_gen.set_debug_visible(toggled_on)
 
 func _on_seed_changed(val: float) -> void:
 	var tree_gen = get_node_or_null("../TreeGenerator3D")
@@ -241,6 +241,9 @@ func _on_pos_changed(val: float, axis: String) -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	var focus_owner = get_viewport().gui_get_focus_owner()
 	if focus_owner and focus_owner is LineEdit:
+		# Clicking outside a value box releases focus (same as pressing Enter)
+		if event is InputEventMouseButton and event.is_pressed():
+			focus_owner.release_focus()
 		return
 
 	if event is InputEventMouseButton and event.is_pressed():
