@@ -79,6 +79,38 @@ func validate_rule(rule: String) -> String:
 	return ""
 
 func randomize_rule_x() -> String:
+	var max_attempts = 50
+	for attempt in range(max_attempts):
+		var candidate = _generate_random_rule()
+		var count = estimate_branch_count(candidate)
+		if count >= 30 and count <= 3000:
+			return candidate
+	# Fallback to a known-good rule if nothing passed
+	return "F-[[X]+X]+F[+FX]-X"
+
+func estimate_branch_count(rule: String) -> int:
+	# Dry-run expand with the candidate rule and count '[' as branch markers
+	var s := axiom
+	for i in range(iterations):
+		var next := ""
+		for c in s:
+			if c == "X":
+				next += rule
+			elif c == "F":
+				next += rule_F
+			else:
+				next += c
+		s = next
+		# Early exit if string is exploding
+		if s.length() > 100000:
+			return 99999
+	var count := 0
+	for c in s:
+		if c == "[":
+			count += 1
+	return count
+
+func _generate_random_rule() -> String:
 	var parts := []
 	var num_segments = rng.randi_range(3, 7)
 	for i in range(num_segments):
@@ -394,6 +426,16 @@ func set_debug_visible(on: bool) -> void:
 	for m in debug_meshes:
 		if is_instance_valid(m):
 			m.visible = on
+
+func get_tree_bounds() -> AABB:
+	var bounds = AABB(global_position, Vector3.ZERO)  # Start from trunk base
+	for b in branches:
+		for key in ["anchor", "tip"]:
+			var node: Node3D = b[key]
+			if is_instance_valid(node):
+				var p = node.global_position
+				bounds = bounds.expand(p)
+	return bounds
 
 
 # DYNAMIC VISUAL UPDATE

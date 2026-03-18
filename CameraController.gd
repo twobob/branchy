@@ -176,7 +176,7 @@ func _ready() -> void:
 	
 	var rule_status = Label.new()
 	rule_status.name = "RuleStatus"
-	rule_status.text = "✓ Valid"
+	rule_status.text = "Valid"
 	rule_status.add_theme_color_override("font_color", Color.GREEN)
 	panel.add_child(rule_status)
 	
@@ -194,6 +194,10 @@ func _ready() -> void:
 			var new_rule = tree_gen.randomize_rule_x()
 			rule_edit.text = new_rule
 			_apply_rule(new_rule, rule_edit, rule_status)
+			# Auto-frame after a tiny delay so physics positions settle
+			await get_tree().process_frame
+			await get_tree().process_frame
+			frame_tree()
 	)
 
 	_add_slider(panel, "Iterations", "iterations", 1, 8, 1, tree_gen, true)
@@ -207,6 +211,31 @@ func _ready() -> void:
 	
 	_add_slider(panel, "Stiffness", "stiffness", 0.0, 200.0, 1.0, tree_gen, true)
 	_add_slider(panel, "Damping", "damping", 0.0, 50.0, 0.1, tree_gen, true)
+	# Right Middle Panel - Key Legend
+	var legend_panel = VBoxContainer.new()
+	legend_panel.name = "LegendPanel"
+	legend_panel.set_anchors_preset(Control.PRESET_CENTER_RIGHT)
+	legend_panel.position = Vector2(-220, -80)
+	canvas.add_child(legend_panel)
+	
+	var legend_title = Label.new()
+	legend_title.text = "Camera Controls"
+	legend_title.add_theme_font_size_override("font_size", 18)
+	legend_panel.add_child(legend_title)
+	
+	var keys = [
+		"W/S - Forward / Back",
+		"A/D - Strafe Left / Right",
+		"Q/E - Down / Up",
+		"Left/Right - Orbit",
+		"Scroll - Zoom",
+	]
+	for k in keys:
+		var lbl = Label.new()
+		lbl.text = k
+		lbl.add_theme_font_size_override("font_size", 14)
+		legend_panel.add_child(lbl)
+
 	# Bottom Right Panel - Wind Controls
 	var bottom_right_panel = VBoxContainer.new()
 	bottom_right_panel.name = "BottomRightPanel"
@@ -253,16 +282,42 @@ func _add_slider(panel: Control, label_text: String, prop_name: String, min_val:
 				tree_gen.regenerate_tree(tree_gen.seed)
 	)
 
+func frame_tree() -> void:
+	var tree_gen = get_node_or_null("../TreeGenerator3D")
+	if not tree_gen or not tree_gen.has_method("get_tree_bounds"):
+		return
+	var bounds = tree_gen.get_tree_bounds()
+	if bounds.size.length() < 0.01:
+		return
+	
+	var center = bounds.get_center()
+	var tree_height = bounds.size.y
+	
+	# Calculate distance needed so tree height fills the vertical FOV
+	var half_fov = deg_to_rad(fov * 0.5)
+	var required_dist = (tree_height * 0.55) / tan(half_fov)
+	
+	# Position camera looking at center from the current horizontal direction
+	var cam_dir = -global_transform.basis.z.normalized()
+	# Keep the horizontal direction, but aim at center
+	var horizontal = Vector3(cam_dir.x, 0, cam_dir.z).normalized()
+	if horizontal.length() < 0.01:
+		horizontal = Vector3(0, 0, -1)
+	
+	position = center - horizontal * required_dist
+	position.y = center.y
+	look_at(center, Vector3.UP)
+
 func _validate_rule_ui(rule_text: String, status_label: Label) -> void:
 	var tree_gen = get_node_or_null("../TreeGenerator3D")
 	if not tree_gen:
 		return
 	var err = tree_gen.validate_rule(rule_text)
 	if err == "":
-		status_label.text = "✓ Valid"
+		status_label.text = "Valid"
 		status_label.add_theme_color_override("font_color", Color.GREEN)
 	else:
-		status_label.text = "✗ " + err
+		status_label.text = err
 		status_label.add_theme_color_override("font_color", Color.RED)
 
 func _apply_rule(rule_text: String, rule_edit: LineEdit, status_label: Label) -> void:
@@ -273,10 +328,10 @@ func _apply_rule(rule_text: String, rule_edit: LineEdit, status_label: Label) ->
 	if err == "":
 		tree_gen.rule_X = rule_text
 		tree_gen.regenerate_tree(tree_gen.seed)
-		status_label.text = "✓ Valid"
+		status_label.text = "VALID Branches rendered: %d" % tree_gen.branches.size()
 		status_label.add_theme_color_override("font_color", Color.GREEN)
 	else:
-		status_label.text = "✗ " + err
+		status_label.text = err
 		status_label.add_theme_color_override("font_color", Color.RED)
 
 func _on_self_col_toggled(toggled_on: bool) -> void:
