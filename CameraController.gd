@@ -191,9 +191,15 @@ func _ready() -> void:
 	
 	randomize_btn.pressed.connect(func():
 		if tree_gen:
-			var new_rule = tree_gen.randomize_rule_x()
-			rule_edit.text = new_rule
-			_apply_rule(new_rule, rule_edit, rule_status)
+			for _attempt in range(20):
+				var new_rule = tree_gen.randomize_rule_x()
+				tree_gen.rule_X = new_rule
+				tree_gen.regenerate_tree(tree_gen.seed)
+				if tree_gen.branches.size() > 0:
+					rule_edit.text = new_rule
+					rule_status.text = "VALID Branches rendered: %d" % tree_gen.branches.size()
+					rule_status.add_theme_color_override("font_color", Color.GREEN)
+					break
 			# Auto-frame after a tiny delay so physics positions settle
 			await get_tree().process_frame
 			await get_tree().process_frame
@@ -326,10 +332,19 @@ func _apply_rule(rule_text: String, rule_edit: LineEdit, status_label: Label) ->
 		return
 	var err = tree_gen.validate_rule(rule_text)
 	if err == "":
+		var old_rule = tree_gen.rule_X
 		tree_gen.rule_X = rule_text
 		tree_gen.regenerate_tree(tree_gen.seed)
-		status_label.text = "VALID Branches rendered: %d" % tree_gen.branches.size()
-		status_label.add_theme_color_override("font_color", Color.GREEN)
+		if tree_gen.branches.size() == 0:
+			# Revert to previous working rule
+			tree_gen.rule_X = old_rule
+			tree_gen.regenerate_tree(tree_gen.seed)
+			rule_edit.text = old_rule
+			status_label.text = "Rule produced 0 branches"
+			status_label.add_theme_color_override("font_color", Color.RED)
+		else:
+			status_label.text = "VALID Branches rendered: %d" % tree_gen.branches.size()
+			status_label.add_theme_color_override("font_color", Color.GREEN)
 	else:
 		status_label.text = err
 		status_label.add_theme_color_override("font_color", Color.RED)
