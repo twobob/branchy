@@ -23,7 +23,6 @@ func _ready() -> void:
 	panel.name = "UIPanel"
 	scroll.add_child(panel)
 
-	# Top Right Panel - Camera Controls
 	var top_right_panel = VBoxContainer.new()
 	top_right_panel.name = "TopRightPanel"
 	top_right_panel.set_anchors_preset(Control.PRESET_TOP_RIGHT)
@@ -57,7 +56,6 @@ func _ready() -> void:
 		hbox.add_child(spin)
 		spin.value_changed.connect(_on_pos_changed.bind(axis))
 		
-	# Add Seed Control UI
 	var seed_hbox = HBoxContainer.new()
 	seed_hbox.name = "HBoxSEED"
 	panel.add_child(seed_hbox)
@@ -81,14 +79,12 @@ func _ready() -> void:
 	
 	seed_hbox.add_child(seed_spin)
 	
-	# Fetch initial seed from generator
 	var tree_gen = get_node_or_null("../TreeGenerator3D")
 	if tree_gen:
 		seed_spin.set_value_no_signal(tree_gen.seed)
 	
 	seed_spin.value_changed.connect(_on_seed_changed)
 
-	# Add Collision Debug UI
 	var debug_hbox = HBoxContainer.new()
 	debug_hbox.name = "HBoxDEBUG"
 	panel.add_child(debug_hbox)
@@ -109,7 +105,6 @@ func _ready() -> void:
 	
 	debug_check.toggled.connect(_on_debug_toggled)
 
-	# Add Collision Shape UI
 	var shape_hbox = HBoxContainer.new()
 	shape_hbox.name = "HBoxSHAPE"
 	panel.add_child(shape_hbox)
@@ -131,7 +126,6 @@ func _ready() -> void:
 	shape_hbox.add_child(shape_opt)
 	shape_opt.item_selected.connect(_on_shape_toggled)
 	
-	# Add Self-Collision UI
 	var self_col_hbox = HBoxContainer.new()
 	self_col_hbox.name = "HBoxSELFCOL"
 	panel.add_child(self_col_hbox)
@@ -151,7 +145,6 @@ func _ready() -> void:
 	self_col_hbox.add_child(self_col_check)
 	self_col_check.toggled.connect(_on_self_col_toggled)
 	
-	# Rule X Editor
 	var rule_label = Label.new()
 	rule_label.text = "Rule X:"
 	panel.add_child(rule_label)
@@ -200,13 +193,12 @@ func _ready() -> void:
 					rule_status.text = "VALID Branches rendered: %d" % tree_gen.branches.size()
 					rule_status.add_theme_color_override("font_color", Color.GREEN)
 					break
-			# Auto-frame after a tiny delay so physics positions settle
 			await get_tree().process_frame
 			await get_tree().process_frame
 			frame_tree()
 	)
 
-	_add_slider(panel, "Iterations", "iterations", 1, 8, 1, tree_gen, true)
+	_add_slider(panel, "Iterations", "iterations", 1, 10, 1, tree_gen, true)
 	_add_slider(panel, "Segment Len", "segment_length", 0.1, 8.0, 0.1, tree_gen, true)
 	_add_slider(panel, "Branch Angle", "angle_deg", 5.0, 80.0, 1.0, tree_gen, true)
 	_add_slider(panel, "Thickness", "branch_thickness", 0.05, 2.0, 0.05, tree_gen, true)
@@ -215,9 +207,9 @@ func _ready() -> void:
 	_add_slider(panel, "Vertical Falloff", "vertical_falloff", 0.1, 5.0, 0.1, tree_gen, true)
 	_add_slider(panel, "Branch Scaling", "branch_length_scale", 0.1, 3.0, 0.1, tree_gen, true)
 	
-	_add_slider(panel, "Stiffness", "stiffness", 0.0, 200.0, 1.0, tree_gen, true)
+	_add_slider(panel, "Stiffness", "stiffness", 0.0, 200.0, 0.1, tree_gen, true)
 	_add_slider(panel, "Damping", "damping", 0.0, 50.0, 0.1, tree_gen, true)
-	# Right Middle Panel - Key Legend
+
 	var legend_panel = VBoxContainer.new()
 	legend_panel.name = "LegendPanel"
 	legend_panel.set_anchors_preset(Control.PRESET_CENTER_RIGHT)
@@ -242,7 +234,6 @@ func _ready() -> void:
 		lbl.add_theme_font_size_override("font_size", 14)
 		legend_panel.add_child(lbl)
 
-	# Bottom Right Panel - Wind Controls
 	var bottom_right_panel = VBoxContainer.new()
 	bottom_right_panel.name = "BottomRightPanel"
 	bottom_right_panel.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
@@ -253,6 +244,10 @@ func _ready() -> void:
 	_add_slider(bottom_right_panel, "Wind Scale", "wind_scale", 0.1, 20.0, 0.1, tree_gen, false)
 	_add_slider(bottom_right_panel, "Wind Speed", "wind_speed", 0.0, 20.0, 0.1, tree_gen, false)
 	_add_slider(bottom_right_panel, "Capsule Wind x", "capsule_wind_multiplier", 1.0, 50.0, 0.5, tree_gen, false)
+
+	await get_tree().process_frame
+	await get_tree().process_frame
+	frame_tree()
 
 func _add_slider(panel: Control, label_text: String, prop_name: String, min_val: float, max_val: float, step: float, tree_gen: Node, triggers_regen: bool):
 	var hbox = HBoxContainer.new()
@@ -286,6 +281,13 @@ func _add_slider(panel: Control, label_text: String, prop_name: String, min_val:
 			tree_gen.set(prop_name, val)
 			if triggers_regen and tree_gen.has_method("regenerate_tree"):
 				tree_gen.regenerate_tree(tree_gen.seed)
+				var rule_status = panel.get_node_or_null("RuleStatus")
+				if rule_status:
+					rule_status.text = "VALID Branches rendered: %d" % tree_gen.branches.size()
+					rule_status.add_theme_color_override("font_color", Color.GREEN)
+				await get_tree().process_frame
+				await get_tree().process_frame
+				frame_tree()
 	)
 
 func frame_tree() -> void:
@@ -299,13 +301,10 @@ func frame_tree() -> void:
 	var center = bounds.get_center()
 	var tree_height = bounds.size.y
 	
-	# Calculate distance needed so tree height fills the vertical FOV
 	var half_fov = deg_to_rad(fov * 0.5)
 	var required_dist = (tree_height * 0.55) / tan(half_fov)
 	
-	# Position camera looking at center from the current horizontal direction
 	var cam_dir = -global_transform.basis.z.normalized()
-	# Keep the horizontal direction, but aim at center
 	var horizontal = Vector3(cam_dir.x, 0, cam_dir.z).normalized()
 	if horizontal.length() < 0.01:
 		horizontal = Vector3(0, 0, -1)
@@ -336,7 +335,6 @@ func _apply_rule(rule_text: String, rule_edit: LineEdit, status_label: Label) ->
 		tree_gen.rule_X = rule_text
 		tree_gen.regenerate_tree(tree_gen.seed)
 		if tree_gen.branches.size() == 0:
-			# Revert to previous working rule
 			tree_gen.rule_X = old_rule
 			tree_gen.regenerate_tree(tree_gen.seed)
 			rule_edit.text = old_rule
@@ -382,14 +380,12 @@ func _on_pos_changed(val: float, axis: String) -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	var focus_owner = get_viewport().gui_get_focus_owner()
 	if focus_owner and focus_owner is LineEdit:
-		# Clicking outside a value box releases focus (same as pressing Enter)
 		if event is InputEventMouseButton and event.is_pressed():
 			focus_owner.release_focus()
 		return
 
 	if event is InputEventMouseButton and event.is_pressed():
 		var zoom_speed = 2.0
-		# Zoom directly along where the camera is currently looking
 		var forward_dir = -global_transform.basis.z.normalized()
 		
 		if event.button_index == MOUSE_BUTTON_WHEEL_UP:
@@ -421,42 +417,34 @@ func _process(delta: float) -> void:
 		
 	var t_move := Vector3.ZERO
 	
-	# Global Up / Down
 	if Input.is_key_pressed(KEY_E) or Input.is_key_pressed(KEY_UP):
-		t_move.y += 1.0
+		t_move.y -= 3.0
 	if Input.is_key_pressed(KEY_Q) or Input.is_key_pressed(KEY_DOWN):
-		t_move.y -= 1.0
+		t_move.y += 3.0
 		
-	# Strafe Left / Right
 	var right_vec = global_transform.basis.x.normalized()
 	if Input.is_key_pressed(KEY_D):
 		t_move += right_vec
 	if Input.is_key_pressed(KEY_A):
 		t_move -= right_vec
 		
-	# Orbit Left / Right (Rotates position around global Y axis without snapping looking angle)
 	if Input.is_key_pressed(KEY_RIGHT) or Input.is_key_pressed(KEY_LEFT):
 		var angle = move_speed * delta * 0.1
 		if Input.is_key_pressed(KEY_LEFT):
 			angle = -angle
 			
-		# Extract horizontal 2D position relative to center (0,0)
 		var pos_2d = Vector2(position.x, position.z)
 		
-		# Rotate 2D vector
 		var cos_a = cos(angle)
 		var sin_a = sin(angle)
 		var new_x = pos_2d.x * cos_a - pos_2d.y * sin_a
 		var new_z = pos_2d.x * sin_a + pos_2d.y * cos_a
 		
-		# Apply exclusively to X and Z, perfectly preserving Y
 		position.x = new_x
 		position.z = new_z
 		
-		# Rotate the camera itself around its own Y axis by the exact same amount
 		rotate_y(-angle)
 		
-	# Forward / Backward (Flattened to XZ plane so W/S never move you straight into the ground)
 	var forward_vec = -global_transform.basis.z
 	forward_vec.y = 0
 	if forward_vec.length_squared() > 0.001:

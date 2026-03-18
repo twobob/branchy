@@ -1,13 +1,11 @@
 extends Node3D
 class_name TreeGenerator3D
 
-# ---------- L-SYSTEM ----------
 @export var axiom: String = "X"
 @export var rule_X: String = "F-[[X]+X]+F[+FX]-X"
 @export var rule_F: String = "FF"
 @export var iterations: int = 5
 
-# ---------- SHAPE ----------
 @export var segment_length: float = 0.6
 @export var angle_deg: float = 25.0
 @export var branch_thickness: float = 0.25
@@ -17,19 +15,16 @@ class_name TreeGenerator3D
 @export var vertical_falloff: float = 1.6
 @export var branch_length_scale: float = 0.7
 
-# ---------- PHYSICS ----------
 @export_enum("Capsule", "Sphere") var collision_shape_type: int = 0
 @export var enable_self_collision: bool = false
 @export var capsule_wind_multiplier: float = 5.0
 @export var stiffness: float = 18.0
 @export var damping: float = 3.5
 
-# ---------- WIND ----------
 @export var wind_strength: float = 12.0
 @export var wind_scale: float = 0.5
 @export var wind_speed: float = 0.6
 
-# ---------- RANDOM ----------
 @export var seed: int = 1
 
 var rng := RandomNumberGenerator.new()
@@ -42,9 +37,6 @@ var tree_material: StandardMaterial3D
 var debug_material: StandardMaterial3D
 var wind_noise: FastNoiseLite
 
-# ---------------------------------------
-# L-SYSTEM
-# ---------------------------------------
 func expand() -> String:
 	var s := axiom
 	for i in range(iterations):
@@ -85,11 +77,9 @@ func randomize_rule_x() -> String:
 		var count = estimate_branch_count(candidate)
 		if count >= 30 and count <= 3000:
 			return candidate
-	# Fallback to a known-good rule if nothing passed
 	return "F-[[X]+X]+F[+FX]-X"
 
 func estimate_branch_count(rule: String) -> int:
-	# Dry-run expand with the candidate rule and count '[' as branch markers
 	var s := axiom
 	for i in range(iterations):
 		var next := ""
@@ -101,7 +91,6 @@ func estimate_branch_count(rule: String) -> int:
 			else:
 				next += c
 		s = next
-		# Early exit if string is exploding
 		if s.length() > 100000:
 			return 99999
 	var count := 0
@@ -118,7 +107,6 @@ func _generate_random_rule() -> String:
 		if r < 0.3:
 			parts.append("F")
 		elif r < 0.5:
-			# Branching with rotation
 			var sign = ["+", "-"][rng.randi_range(0, 1)]
 			var inner = ""
 			var inner_len = rng.randi_range(1, 3)
@@ -130,18 +118,14 @@ func _generate_random_rule() -> String:
 		elif r < 0.85:
 			parts.append("X")
 		else:
-			# Nested branch
 			var sign1 = ["+", "-"][rng.randi_range(0, 1)]
 			var sign2 = ["+", "-"][rng.randi_range(0, 1)]
 			parts.append("[" + sign1 + "[X]" + sign2 + "X]")
 	return "".join(parts)
 
-# ---------------------------------------
-# GENERATION
-# ---------------------------------------
 func _ready():
 	tree_material = StandardMaterial3D.new()
-	tree_material.albedo_color = Color(0.2, 0.5, 0.2) # Green
+	tree_material.albedo_color = Color(0.2, 0.5, 0.2)
 	tree_material.roughness = 0.9
 	
 	debug_material = StandardMaterial3D.new()
@@ -151,7 +135,7 @@ func _ready():
 	
 	wind_noise = FastNoiseLite.new()
 	wind_noise.noise_type = FastNoiseLite.TYPE_SIMPLEX
-	wind_noise.frequency = 0.015  # Much broader, swooping gusts
+	wind_noise.frequency = 0.015
 	
 	regenerate_tree(seed)
 
@@ -160,7 +144,6 @@ func regenerate_tree(new_seed: int):
 	rng.seed = seed
 	wind_noise.seed = seed
 	
-	# Clear out the old tree
 	for child in get_children():
 		child.queue_free()
 	branches.clear()
@@ -176,14 +159,8 @@ func generate_tree():
 	var pos := Vector3.ZERO
 	var dir := Vector3.UP
 
-	# The L-System effectively defines the "trunk" path. Give it its own physics branch!
 	var current_branch_root = Node3D.new()
 	add_child(current_branch_root)
-	
-	# We structure the tree as a series of connected RigidBodies for the trunk,
-	# OR we build the trunk as one large static object, and leaf-branches are rigid bodies.
-	# "Each branch = one rigid body + one joint"
-	# Let's create the root trunk as the first static branch geometry, but rigid bodies for sub-branches.
 	
 	var trunk_height := estimate_height(commands)
 	var current_height := 0.0
@@ -194,22 +171,18 @@ func generate_tree():
 	var current_path := [pos]
 	var current_thicknesses := [branch_thickness]
 	
-	# Let's extract L-system into pure continuous paths.
 	for c in commands:
 		match c:
 			"F":
 				var next_pos = pos + dir * segment_length
 				current_height = pos.y / trunk_height
 				
-				# Taper logic: Thinnest at top
 				var t = 1.0 - clamp(pos.y / trunk_height, 0.0, 1.0)
 				var current_t = branch_thickness * t + thickness_taper
 				
-				# Build path
 				current_path.append(next_pos)
 				current_thicknesses.append(current_t)
 				
-				# Spawn secondary detached branches
 				if should_spawn_branch(current_height):
 					create_branch(pos, dir, current_height, true)
 					
@@ -217,14 +190,13 @@ func generate_tree():
 				
 			"+":
 				dir = dir.rotated(Vector3.FORWARD, deg_to_rad(angle_deg))
-				# Also add a slight random twist so it's fully 3D
 				dir = dir.rotated(Vector3.UP, deg_to_rad(rng.randf_range(30, 150)))
 			"-":
 				dir = dir.rotated(Vector3.FORWARD, deg_to_rad(-angle_deg))
 				dir = dir.rotated(Vector3.UP, deg_to_rad(rng.randf_range(-150, -30)))
 			"[":
 				stack.append({"pos": pos, "dir": dir, "path": current_path.duplicate(), "thick": current_thicknesses.duplicate()})
-				current_path = [pos] # Sub-branch starts here
+				current_path = [pos]
 				current_thicknesses = [current_thicknesses.back()]
 			"]":
 				if current_path.size() > 1:
@@ -241,7 +213,6 @@ func generate_tree():
 		branch_paths.append(current_path)
 		path_thicknesses.append(current_thicknesses)
 		
-	# Now generate the STATIC TRUNK paths so it exists visually!
 	for i in range(branch_paths.size()):
 		create_static_branch(branch_paths[i], path_thicknesses[i])
 
@@ -271,20 +242,12 @@ func should_spawn_branch(h: float) -> bool:
 	if h < base_branch_offset:
 		return false
 	var falloff = pow(1.0 - h, vertical_falloff)
-	# Increased branch chance slightly
 	return rng.randf() < (falloff * 2.0)
 
-
-# BRANCH CREATION
-
-
 func create_static_branch(path: Array, thicknesses: Array):
-	# Creates a static visual branch for the structural trunk lines
 	var mesh_node = MeshInstance3D.new()
 	add_child(mesh_node)
 	mesh_node.material_override = tree_material
-	
-	# Create tube mesh
 	mesh_node.mesh = generate_tube_array(path, thicknesses)
 
 func create_branch(origin: Vector3, trunk_dir: Vector3, height_ratio: float, dynamic: bool):
@@ -311,7 +274,6 @@ func create_branch(origin: Vector3, trunk_dir: Vector3, height_ratio: float, dyn
 	branch_root.add_child(tip)
 	
 	if not enable_self_collision:
-		# Disable collision with other objects on Layer 1
 		tip.collision_mask = 0
 		tip.collision_layer = 0
 	
@@ -334,30 +296,22 @@ func create_branch(origin: Vector3, trunk_dir: Vector3, height_ratio: float, dyn
 		joint.set("angular_spring_%s_stiffness" % axis_i, stiffness)
 		joint.set("angular_spring_%s_damping" % axis_i, damping)
 
-	# Offset mesh to start from anchor but move with tip
 	var visual = MeshInstance3D.new()
 	tip.add_child(visual)
 	visual.material_override = tree_material
 	
-	# Generate static tube mesh from anchor(0,0,0 local) to tip position (in tip's local space)
 	var local_rest_pos = -dir * length
 	var static_path = [local_rest_pos, Vector3.ZERO]
 	var generated_mesh = generate_tube(static_path, thick, thickness_taper)
 	visual.mesh = generated_mesh
 	
-	# Extract structural collision shape
-	# OPTIMIZATION: create_convex_shape on a tube mesh generates a highly complex triangulated hull.
-	# With 100+ branches, simulating that many convex hulls completely crashes Jolt performance.
-	# We must use simple mathematical primitives scaled to match the geometry.
 	var tip_col = CollisionShape3D.new()
 	
-	if collision_shape_type == 0: # Capsule
+	if collision_shape_type == 0:
 		var tip_capsule = CapsuleShape3D.new()
 		tip_capsule.radius = thick
 		tip_capsule.height = length + (thick * 2.0)
 		tip_col.shape = tip_capsule
-		
-		# Rotate and position capsule to match visual mesh
 		tip_col.position = -dir * (length * 0.5)
 		
 		var up = Vector3.UP
@@ -365,7 +319,7 @@ func create_branch(origin: Vector3, trunk_dir: Vector3, height_ratio: float, dyn
 		var x_axis = dir.cross(up).normalized()
 		var z_axis = x_axis.cross(dir).normalized()
 		tip_col.basis = Basis(x_axis, dir, z_axis)
-	else: # Sphere
+	else:
 		var tip_sphere = SphereShape3D.new()
 		tip_sphere.radius = thick * 0.5
 		tip_col.shape = tip_sphere
@@ -383,12 +337,11 @@ func create_branch(origin: Vector3, trunk_dir: Vector3, height_ratio: float, dyn
 		"tip": tip
 	})
 	
-	# Create debug visualization mesh matching the collision shape
 	var debug_vis = MeshInstance3D.new()
 	debug_vis.material_override = debug_material
 	debug_vis.visible = show_debug
 	
-	if collision_shape_type == 0: # Capsule
+	if collision_shape_type == 0:
 		var cap_mesh = CapsuleMesh.new()
 		cap_mesh.radius = thick
 		cap_mesh.height = length + (thick * 2.0)
@@ -397,7 +350,7 @@ func create_branch(origin: Vector3, trunk_dir: Vector3, height_ratio: float, dyn
 		debug_vis.mesh = cap_mesh
 		debug_vis.position = tip_col.position
 		debug_vis.basis = tip_col.basis
-	else: # Sphere
+	else:
 		var sph_mesh = SphereMesh.new()
 		sph_mesh.radius = thick
 		sph_mesh.height = thick * 2.0
@@ -408,7 +361,6 @@ func create_branch(origin: Vector3, trunk_dir: Vector3, height_ratio: float, dyn
 	tip.add_child(debug_vis)
 	debug_meshes.append(debug_vis)
 	
-	# Anchor debug sphere
 	var anchor_debug = MeshInstance3D.new()
 	var anc_mesh = SphereMesh.new()
 	anc_mesh.radius = thick
@@ -428,17 +380,24 @@ func set_debug_visible(on: bool) -> void:
 			m.visible = on
 
 func get_tree_bounds() -> AABB:
-	var bounds = AABB(global_position, Vector3.ZERO)  # Start from trunk base
-	for b in branches:
-		for key in ["anchor", "tip"]:
-			var node: Node3D = b[key]
-			if is_instance_valid(node):
-				var p = node.global_position
-				bounds = bounds.expand(p)
+	var bounds = AABB(global_position, Vector3.ZERO)
+	bounds = _expand_bounds_recursive(self, bounds)
 	return bounds
 
-
-# DYNAMIC VISUAL UPDATE
+func _expand_bounds_recursive(node: Node, bounds: AABB) -> AABB:
+	if node is MeshInstance3D and node.mesh:
+		var mesh_aabb = node.mesh.get_aabb()
+		var t = node.global_transform
+		for i in range(8):
+			var corner = Vector3(
+				mesh_aabb.position.x + mesh_aabb.size.x * (1 if i & 1 else 0),
+				mesh_aabb.position.y + mesh_aabb.size.y * (1 if i & 2 else 0),
+				mesh_aabb.position.z + mesh_aabb.size.z * (1 if i & 4 else 0)
+			)
+			bounds = bounds.expand(t * corner)
+	for child in node.get_children():
+		bounds = _expand_bounds_recursive(child, bounds)
+	return bounds
 
 func _physics_process(delta):
 	time_accum += delta
@@ -449,27 +408,21 @@ func apply_wind(b, delta):
 	var tip: RigidBody3D = b.tip
 	var p = tip.global_position * wind_scale
 	
-	# Sample FastNoiseLite in 3D space, offset by time to simulate wind moving through the tree
-	# We offset the Y and Z coordinates slightly per axis so they don't perfectly correlate
 	var time_offset = time_accum * wind_speed * 5.0
 	var nx = wind_noise.get_noise_3d(p.x, p.y, p.z + time_offset)
 	var ny = wind_noise.get_noise_3d(p.x + 100.0, p.y + time_offset, p.z)
 	var nz = wind_noise.get_noise_3d(p.x, p.y + 200.0, p.z + time_offset)
 	
-	# Boost the wind force so the broad sweeping gusts are noticeably strong
 	var wind = Vector3(nx, ny * 0.5, nz) * wind_strength * 2.5
-	if collision_shape_type == 0: # Capsule
+	if collision_shape_type == 0:
 		wind *= capsule_wind_multiplier
 	tip.apply_central_force(wind)
-
-
-# TUBE GENERATION
 
 func generate_tube_array(path: Array, thicknesses: Array) -> ArrayMesh:
 	var st = SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	
-	var radial_segments = 6 # Low poly for performance
+	var radial_segments = 6
 	
 	for i in range(path.size()):
 		var pt = path[i]
@@ -477,7 +430,6 @@ func generate_tube_array(path: Array, thicknesses: Array) -> ArrayMesh:
 		var dir = (next_pt - pt).normalized()
 		if dir.length() < 0.001: dir = Vector3.UP
 		
-		# Build a transform looking along dir
 		var up = Vector3.UP
 		if abs(dir.dot(up)) > 0.99: up = Vector3.RIGHT
 		
@@ -486,7 +438,6 @@ func generate_tube_array(path: Array, thicknesses: Array) -> ArrayMesh:
 		
 		var r = thicknesses[i]
 		
-		# Generate ring
 		for s in range(radial_segments + 1):
 			var angle = (float(s) / radial_segments) * PI * 2.0
 			var ring_pos = pt + (x_axis * cos(angle) + y_axis * sin(angle)) * r
@@ -494,7 +445,6 @@ func generate_tube_array(path: Array, thicknesses: Array) -> ArrayMesh:
 			st.set_uv(Vector2(float(s)/radial_segments, float(i)/path.size()))
 			st.add_vertex(ring_pos)
 
-	# Connect rings
 	for i in range(path.size() - 1):
 		for s in range(radial_segments):
 			var a = i * (radial_segments + 1) + s
@@ -517,7 +467,7 @@ func generate_tube(path: Array, start_thickness: float, end_thickness: float) ->
 	var st = SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	
-	var radial_segments = 6 # Low poly for performance
+	var radial_segments = 6
 	
 	for i in range(path.size()):
 		var pt = path[i]
@@ -525,7 +475,6 @@ func generate_tube(path: Array, start_thickness: float, end_thickness: float) ->
 		var dir = (next_pt - pt).normalized()
 		if dir.length() < 0.001: dir = Vector3.UP
 		
-		# Build a transform looking along dir
 		var up = Vector3.UP
 		if abs(dir.dot(up)) > 0.99: up = Vector3.RIGHT
 		
@@ -538,7 +487,6 @@ func generate_tube(path: Array, start_thickness: float, end_thickness: float) ->
 			
 		var r = lerp(start_thickness, end_thickness, t)
 		
-		# Generate ring
 		for s in range(radial_segments + 1):
 			var angle = float(s) / radial_segments * TAU
 			var local_pos = (x_axis * cos(angle) + y_axis * sin(angle)) * r
@@ -548,7 +496,6 @@ func generate_tube(path: Array, start_thickness: float, end_thickness: float) ->
 			st.set_normal(local_pos.normalized())
 			st.add_vertex(pt + local_pos)
 			
-	# Generate indices
 	for i in range(path.size() - 1):
 		for s in range(radial_segments):
 			var curr_ring = i * (radial_segments + 1)
