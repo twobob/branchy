@@ -1,4 +1,4 @@
-extends Node3D
+﻿extends Node3D
 class_name GameController
 
 enum Mode { SILHOUETTE, DEADWOOD, SANDBOX }
@@ -150,202 +150,7 @@ func _setup_wood_chipper() -> void:
 	hopper_area.body_entered.connect(_on_hopper_body_entered)
 
 func _setup_hud() -> void:
-	canvas_layer = CanvasLayer.new()
-	canvas_layer.name = "GameHUD"
-	add_child(canvas_layer)
-	
-
-	var main_box = HBoxContainer.new()
-	main_box.set_anchors_preset(Control.PRESET_FULL_RECT)
-	main_box.offset_left = 20
-	main_box.offset_top = 20
-	main_box.offset_right = -20
-	main_box.offset_bottom = -20
-	main_box.mouse_filter = Control.MOUSE_FILTER_PASS
-	canvas_layer.add_child(main_box)
-	
-
-	var left_col = VBoxContainer.new()
-	left_col.custom_minimum_size = Vector2(250, 0)
-	left_col.add_theme_constant_override("separation", 15)
-	main_box.add_child(left_col)
-	
-
-	var title = Label.new()
-	title.text = "BRANCHY! 🌳"
-	title.add_theme_font_size_override("font_size", 28)
-	title.add_theme_color_override("font_color", Color.YELLOW)
-	left_col.add_child(title)
-	
-
-	level_title_label = Label.new()
-	level_title_label.text = "Level: Creative Sandbox"
-	level_title_label.add_theme_font_size_override("font_size", 18)
-	left_col.add_child(level_title_label)
-	
-
-	var lvl_group = VBoxContainer.new()
-	lvl_group.name = "LevelGroup"
-	left_col.add_child(lvl_group)
-	
-	var levels = [
-		{"name": "Level 1: Sphere Match", "idx": 1},
-		{"name": "Level 2: Cube Match", "idx": 2},
-		{"name": "Level 3: Deadwood Pruning", "idx": 3},
-		{"name": "Level 4: Creative Sandbox", "idx": 4}
-	]
-	
-	for lvl in levels:
-		var btn = Button.new()
-		btn.text = lvl.name
-		btn.alignment = HorizontalAlignment.HORIZONTAL_ALIGNMENT_LEFT
-		btn.focus_mode = Control.FOCUS_NONE
-		btn.pressed.connect(func():
-			play_procedural_sound("click")
-			select_level(lvl.idx)
-		)
-		lvl_group.add_child(btn)
-		
-
-	var tool_label = Label.new()
-	tool_label.text = "SELECT TOOL:"
-	tool_label.add_theme_font_size_override("font_size", 14)
-	left_col.add_child(tool_label)
-	
-	var tool_box = HBoxContainer.new()
-	tool_box.name = "ToolBox"
-	left_col.add_child(tool_box)
-	
-	var tools = ["Chainsaw", "Handsaw", "Vacuum"]
-	for t in tools:
-		var btn = Button.new()
-		btn.text = t
-		btn.focus_mode = Control.FOCUS_NONE
-		btn.custom_minimum_size = Vector2(80, 40)
-		btn.pressed.connect(func():
-			play_procedural_sound("click")
-			select_tool(t)
-		)
-		tool_box.add_child(btn)
-		
-
-	var action_box = VBoxContainer.new()
-	left_col.add_child(action_box)
-	
-	var regen_btn = Button.new()
-	regen_btn.text = "Regenerate Tree"
-	regen_btn.focus_mode = Control.FOCUS_NONE
-	regen_btn.pressed.connect(func():
-		play_procedural_sound("click")
-		regenerate_current_tree()
-	)
-	action_box.add_child(regen_btn)
-	
-
-	var spacer = Control.new()
-	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	left_col.add_child(spacer)
-	
-
-	var legend_panel = PanelContainer.new()
-	var leg_vbox = VBoxContainer.new()
-	legend_panel.add_child(leg_vbox)
-	left_col.add_child(legend_panel)
-	
-	var leg_title = Label.new()
-	leg_title.text = "HOW TO PLAY:"
-	leg_title.add_theme_font_size_override("font_size", 12)
-	leg_vbox.add_child(leg_title)
-	
-	var leg_text = Label.new()
-	leg_text.text = "- Click branch to cut\n- Vacuum grabs cut wood\n- Drop branches in Chipper!\n- Move: W/A/S/D + Left/Right\n- Zoom: Scroll Wheel"
-	leg_text.add_theme_font_size_override("font_size", 11)
-	leg_vbox.add_child(leg_text)
-	
-
-	var right_col = VBoxContainer.new()
-	right_col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	right_col.alignment = BoxContainer.ALIGNMENT_BEGIN
-	right_col.mouse_filter = Control.MOUSE_FILTER_PASS
-	main_box.add_child(right_col)
-	
-
-	var status_bar = HBoxContainer.new()
-	status_bar.alignment = BoxContainer.ALIGNMENT_END
-	status_bar.mouse_filter = Control.MOUSE_FILTER_PASS
-	right_col.add_child(status_bar)
-	
-	score_label = Label.new()
-	score_label.text = "Score: 0"
-	score_label.add_theme_font_size_override("font_size", 22)
-	score_label.add_theme_color_override("font_color", Color.GREEN_YELLOW)
-	score_label.custom_minimum_size = Vector2(180, 0)
-	status_bar.add_child(score_label)
-	
-	accuracy_label = Label.new()
-	accuracy_label.text = ""
-	accuracy_label.add_theme_font_size_override("font_size", 22)
-	accuracy_label.add_theme_color_override("font_color", Color.CYAN)
-	accuracy_label.custom_minimum_size = Vector2(250, 0)
-	status_bar.add_child(accuracy_label)
-	
-
-	var instr_panel = PanelContainer.new()
-	instr_panel.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	instr_panel.offset_top = 20
-	right_col.add_child(instr_panel)
-	
-	info_label = Label.new()
-	info_label.text = "Trim excess branches outside the hologram shape!"
-	info_label.add_theme_font_size_override("font_size", 16)
-	info_label.horizontal_alignment = HorizontalAlignment.HORIZONTAL_ALIGNMENT_CENTER
-	instr_panel.add_child(info_label)
-	
-
-	victory_panel = PanelContainer.new()
-	victory_panel.visible = false
-	victory_panel.set_anchors_preset(Control.PRESET_CENTER)
-	victory_panel.custom_minimum_size = Vector2(400, 200)
-	canvas_layer.add_child(victory_panel)
-	
-	var vic_vbox = VBoxContainer.new()
-	vic_vbox.alignment = BoxContainer.ALIGNMENT_CENTER
-	vic_vbox.add_theme_constant_override("separation", 20)
-	victory_panel.add_child(vic_vbox)
-	
-	victory_label = Label.new()
-	victory_label.text = "LEVEL COMPLETED!\n\u2b50 Perfect Pruning \u2b50"
-	victory_label.add_theme_font_size_override("font_size", 24)
-	victory_label.horizontal_alignment = HorizontalAlignment.HORIZONTAL_ALIGNMENT_CENTER
-	vic_vbox.add_child(victory_label)
-	
-	var next_btn = Button.new()
-	next_btn.text = "Proceed to Next Level"
-	next_btn.custom_minimum_size = Vector2(200, 50)
-	next_btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	next_btn.focus_mode = Control.FOCUS_NONE
-	next_btn.pressed.connect(func():
-		play_procedural_sound("click")
-		victory_panel.visible = false
-		if current_level < 4:
-			select_level(current_level + 1)
-		else:
-			select_level(1)
-	)
-	vic_vbox.add_child(next_btn)
-
-func select_tool(tool_name: String) -> void:
-	active_tool = tool_name
-	
-
-	var tool_box = canvas_layer.get_node_or_null("HBoxContainer/VBoxContainer/ToolBox")
-	if tool_box:
-		for child in tool_box.get_children():
-			if child is Button:
-				if child.text == tool_name:
-					child.add_theme_color_override("font_color", Color.YELLOW)
-				else:
-					child.remove_theme_color_override("font_color")
+	pass
 
 func select_level(level_idx: int) -> void:
 	current_level = level_idx
@@ -550,37 +355,55 @@ func _handle_mouse_action() -> void:
 		return
 		
 	var mouse_pos = get_viewport().get_mouse_position()
+	if get_viewport().gui_get_hovered_control():
+		return
+		
 	var camera = get_viewport().get_camera_3d()
 	if not camera:
 		return
 		
-	var from = camera.project_ray_origin(mouse_pos)
-	var to = from + camera.project_ray_normal(mouse_pos) * 150.0
-	
-	var space_state = camera.get_world_3d().direct_space_state
-	var query = PhysicsRayQueryParameters3D.create(from, to)
-	
-
-	if active_tool == "Vacuum":
-
-		query.collision_mask = 1
-	else:
-
-		query.collision_mask = 2
+	var offsets = [Vector2.ZERO]
+	if active_tool == "Chainsaw":
+		offsets = [
+			Vector2.ZERO,
+			Vector2(-20, 0), Vector2(20, 0),
+			Vector2(0, -20), Vector2(0, 20),
+			Vector2(-15, -15), Vector2(15, -15),
+			Vector2(-15, 15), Vector2(15, 15)
+		]
+	elif active_tool == "Mini-Saw":
+		offsets = [
+			Vector2.ZERO,
+			Vector2(-10, 0), Vector2(10, 0),
+			Vector2(0, -10), Vector2(0, 10)
+		]
 		
-	query.collide_with_areas = false
-	query.collide_with_bodies = true
+	var space_state = camera.get_world_3d().direct_space_state
 	
-	var result = space_state.intersect_ray(query)
-	if result:
-		var hit_body = result.collider
-		if hit_body is RigidBody3D and hit_body.get_meta("is_branch_tip", false):
-			if active_tool == "Vacuum":
-				_vacuum_branch(hit_body)
-			else:
-
-				if not hit_body.get_meta("was_cut", false):
-					_cut_branch_physically(hit_body)
+	for offset in offsets:
+		var sampled_pos = mouse_pos + offset
+		var from = camera.project_ray_origin(sampled_pos)
+		var to = from + camera.project_ray_normal(sampled_pos) * 150.0
+		
+		var query = PhysicsRayQueryParameters3D.create(from, to)
+		if active_tool == "Vacuum":
+			query.collision_mask = 1
+		else:
+			query.collision_mask = 2
+			
+		query.collide_with_areas = false
+		query.collide_with_bodies = true
+		
+		var result = space_state.intersect_ray(query)
+		if result:
+			var hit_body = result.collider
+			if hit_body is RigidBody3D and hit_body.get_meta("is_branch_tip", false):
+				if active_tool == "Vacuum":
+					_vacuum_branch(hit_body)
+					break
+				else:
+					if not hit_body.get_meta("was_cut", false):
+						_cut_branch_physically(hit_body)
 
 func _cut_branch_physically(tip: RigidBody3D) -> void:
 	if not is_instance_valid(tip):
@@ -754,14 +577,23 @@ func complete_level() -> void:
 		spawn_particles(spark_pos, Color(1.0, 0.85, 0.2))
 
 func update_hud() -> void:
-	score_label.text = "Score: %d" % score
-	
-	if current_mode == Mode.SILHOUETTE:
-		accuracy_label.text = "Match Accuracy: %.1f%%" % calculate_accuracy()
-	elif current_mode == Mode.DEADWOOD:
-		accuracy_label.text = "Deadwood: %d/%d | Cut Healthy: %d" % [pruned_deadwood, total_deadwood, healthy_cut]
-	else:
-		accuracy_label.text = "Sandbox Mode"
+	if is_instance_valid(camera_controller):
+		camera_controller.score = score
+		camera_controller.level = current_level
+		if current_mode == Mode.SILHOUETTE:
+			camera_controller.mode = "Topiary Master"
+			camera_controller.accuracy = calculate_accuracy()
+		elif current_mode == Mode.DEADWOOD:
+			camera_controller.mode = "Zen Garden"
+			if total_deadwood > 0:
+				camera_controller.accuracy = float(pruned_deadwood) / total_deadwood * 100.0
+			else:
+				camera_controller.accuracy = 100.0
+		else:
+			camera_controller.mode = "Creative Sandbox"
+			camera_controller.accuracy = 100.0
+		if camera_controller.has_method("refresh_hud"):
+			camera_controller.refresh_hud()
 
 
 func spawn_particles(pos: Vector3, color: Color) -> void:

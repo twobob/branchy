@@ -1,4 +1,4 @@
-extends Node3D
+﻿extends Node3D
 
 
 
@@ -19,24 +19,20 @@ var saw_timer := 0.0
 
 var grinding_branches: Dictionary = {}
 var chipper_center := Vector3(-1.55, 0.84, 3.37)
-
 func _ready():
 	print("Main game coordinator loaded.")
 	
-
 	tree_gen = get_node_or_null("TreeGenerator3D")
 	camera = get_node_or_null("Camera3D")
 	
-
+	var tc = load("res://ToolController.gd").new()
+	tc.name = "ToolController"
+	add_child(tc)
+	
 	setup_ground_plane()
-	
-
 	setup_wood_chipper()
-	
-
 	setup_gui()
-	
-
+	setup_vfx_assets()
 	setup_vfx_assets()
 	var tc = load("res://ToolController.gd").new()
 	tc.name = "ToolController"

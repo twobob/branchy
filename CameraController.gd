@@ -1,4 +1,4 @@
-extends Camera3D
+﻿extends Camera3D
 
 @export var move_speed: float = 10.0
 
@@ -8,10 +8,10 @@ var tool_cards: Dictionary = {}
 var drawer_open: bool = false
 var drawer_panel: PanelContainer
 
-var score: int = 12450
-var level: int = 3
-var mode: String = "Zen Pruning"
-var accuracy: float = 84.0
+var score: int = 0
+var level: int = 4
+var mode: String = "Creative Sandbox"
+var accuracy: float = 100.0
 
 var spin_x: SpinBox
 var spin_y: SpinBox
@@ -30,6 +30,12 @@ var accuracy_progress: ProgressBar
 var accuracy_label: Label
 
 func _ready() -> void:
+	var tc_script = load("res://ToolController.gd")
+	if tc_script:
+		var tc = tc_script.new()
+		tc.name = "ToolController"
+		add_child(tc)
+		
 	var synth_script = load("res://SoundSynthesiser.gd")
 	if synth_script:
 		sound_synthesizer = synth_script.new()
@@ -101,6 +107,36 @@ func _ready() -> void:
 	
 	var tree_gen = get_node_or_null("../TreeGenerator3D")
 	
+	var lvl_lbl = Label.new()
+	lvl_lbl.text = "SELECT LEVEL / MODE:"
+	lvl_lbl.add_theme_color_override("font_color", Color(0.85, 0.67, 0.28, 1.0))
+	lvl_lbl.add_theme_font_size_override("font_size", 14)
+	drawer_vbox.add_child(lvl_lbl)
+	
+	var levels = [
+		{"name": "Level 1: Sphere Match", "idx": 1},
+		{"name": "Level 2: Cube Match", "idx": 2},
+		{"name": "Level 3: Diseased Pruning", "idx": 3},
+		{"name": "Level 4: Creative Sandbox", "idx": 4}
+	]
+	
+	for lvl in levels:
+		var btn = Button.new()
+		btn.text = lvl.name
+		btn.custom_minimum_size = Vector2(280, 36)
+		btn.add_theme_stylebox_override("normal", style_btn_normal)
+		btn.add_theme_stylebox_override("hover", style_btn_hover)
+		btn.add_theme_stylebox_override("pressed", style_btn_pressed)
+		btn.add_theme_color_override("font_color", Color.WHITE)
+		btn.add_theme_font_size_override("font_size", 12)
+		drawer_vbox.add_child(btn)
+		_setup_btn_anims(btn)
+		btn.pressed.connect(func():
+			var g_ctrl = get_node_or_null("../GameController")
+			if g_ctrl and g_ctrl.has_method("select_level"):
+				g_ctrl.select_level(lvl.idx)
+		)
+		
 	var pos_lbl = Label.new()
 	pos_lbl.text = "Camera Position:"
 	pos_lbl.add_theme_color_override("font_color", Color(0.65, 0.65, 0.7, 1.0))
@@ -202,14 +238,12 @@ func _ready() -> void:
 	if tree_gen:
 		rule_edit.text = tree_gen.rule_X
 	rule_hbox.add_child(rule_edit)
+	
 	var rand_btn = Button.new()
 	rand_btn.text = "Rand"
-	rand_btn.custom_minimum_size = Vector2(50, 30)
-	rand_btn.add_theme_stylebox_override("normal", style_btn_normal)
-	rand_btn.add_theme_stylebox_override("hover", style_btn_hover)
-	rand_btn.add_theme_stylebox_override("pressed", style_btn_pressed)
+	rand_btn.custom_minimum_size = Vector2(60, 0)
+	rand_btn.focus_mode = Control.FOCUS_CLICK
 	rule_hbox.add_child(rand_btn)
-	_setup_btn_anims(rand_btn)
 	
 	var rule_status = Label.new()
 	rule_status.text = "Valid"
@@ -256,17 +290,16 @@ func _ready() -> void:
 	wind_header.add_theme_font_size_override("font_size", 14)
 	drawer_vbox.add_child(wind_header)
 	
-	_add_slider(drawer_vbox, "Wind Strength", "wind_strength", 0.0, 200.0, 1.0, tree_gen, false)
 	_add_slider(drawer_vbox, "Wind Scale", "wind_scale", 0.1, 20.0, 0.1, tree_gen, false)
 	_add_slider(drawer_vbox, "Wind Speed", "wind_speed", 0.0, 20.0, 0.1, tree_gen, false)
 	_add_slider(drawer_vbox, "Capsule Wind x", "capsule_wind_multiplier", 1.0, 50.0, 0.5, tree_gen, false)
 	
 	var top_panel = PanelContainer.new()
 	top_panel.name = "TopPanel"
-	top_panel.custom_minimum_size = Vector2(720, 80)
+	top_panel.custom_minimum_size = Vector2(820, 80)
 	top_panel.set_anchors_preset(Control.PRESET_CENTER_TOP)
 	top_panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	top_panel.position = Vector2(-360, 15)
+	top_panel.position = Vector2(-410, 15)
 	var top_style = _create_glass_style(Color(0.08, 0.08, 0.1, 0.65), Color(1.0, 1.0, 1.0, 0.15), 12)
 	top_panel.add_theme_stylebox_override("panel", top_style)
 	canvas.add_child(top_panel)
@@ -278,7 +311,7 @@ func _ready() -> void:
 	
 	var top_hbox = HBoxContainer.new()
 	top_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
-	top_hbox.add_theme_constant_override("separation", 40)
+	top_hbox.add_theme_constant_override("separation", 35)
 	top_margin.add_child(top_hbox)
 	
 	var mode_vbox = VBoxContainer.new()
@@ -340,7 +373,7 @@ func _ready() -> void:
 	accuracy_progress.max_value = 100
 	accuracy_progress.value = accuracy
 	accuracy_progress.show_percentage = false
-	accuracy_progress.custom_minimum_size = Vector2(120, 10)
+	accuracy_progress.custom_minimum_size = Vector2(100, 10)
 	accuracy_progress.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	var pg_bg = StyleBoxFlat.new()
 	pg_bg.bg_color = Color(1, 1, 1, 0.05)
@@ -363,6 +396,35 @@ func _ready() -> void:
 	accuracy_label.add_theme_color_override("font_color", Color(0.46, 0.76, 0.54, 1.0))
 	accuracy_label.add_theme_font_size_override("font_size", 14)
 	acc_hbox.add_child(accuracy_label)
+	
+	var wind_vbox = VBoxContainer.new()
+	wind_vbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	top_hbox.add_child(wind_vbox)
+	var wind_title = Label.new()
+	wind_title.text = "BREEZE CONTROL"
+	wind_title.add_theme_color_override("font_color", Color(0.65, 0.65, 0.7, 1.0))
+	wind_title.add_theme_font_size_override("font_size", 10)
+	wind_vbox.add_child(wind_title)
+	var wind_h = HBoxContainer.new()
+	wind_h.add_theme_constant_override("separation", 10)
+	wind_vbox.add_child(wind_h)
+	var wind_slide = HSlider.new()
+	wind_slide.min_value = 0.0
+	wind_slide.max_value = 100.0
+	wind_slide.value = tree_gen.wind_strength if tree_gen else 15.0
+	wind_slide.custom_minimum_size = Vector2(100, 16)
+	wind_slide.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	wind_h.add_child(wind_slide)
+	var wind_val_lbl = Label.new()
+	wind_val_lbl.text = "%d" % int(wind_slide.value)
+	wind_val_lbl.add_theme_color_override("font_color", Color(0.85, 0.67, 0.28, 1.0))
+	wind_val_lbl.add_theme_font_size_override("font_size", 12)
+	wind_h.add_child(wind_val_lbl)
+	wind_slide.value_changed.connect(func(val: float):
+		wind_val_lbl.text = "%d" % int(val)
+		if tree_gen:
+			tree_gen.wind_strength = val
+	)
 	
 	var tool_bar = PanelContainer.new()
 	tool_bar.name = "ToolBar"
@@ -387,15 +449,15 @@ func _ready() -> void:
 	
 	var tools_list = ["Chainsaw", "Mini-Saw", "Pruning Shears", "Hands"]
 	var tool_emojis = {
-		"Chainsaw": "??",
-		"Mini-Saw": "?",
-		"Pruning Shears": "??",
-		"Hands": "???"
+		"Chainsaw": "[Chainsaw] ",
+		"Mini-Saw": "[Mini-Saw] ",
+		"Pruning Shears": "[Shears] ",
+		"Hands": "[Hands] "
 	}
 	
 	for t_name in tools_list:
 		var btn = Button.new()
-		btn.text = tool_emojis[t_name] + " " + t_name
+		btn.text = tool_emojis[t_name] + t_name
 		btn.custom_minimum_size = Vector2(110, 70)
 		btn.add_theme_stylebox_override("normal", style_inactive_card)
 		btn.add_theme_stylebox_override("hover", style_btn_hover)
@@ -519,12 +581,28 @@ func select_tool(t_name: String) -> void:
 		elif active_tool == "Hands":
 			sound_synthesizer.play_sound("chime")
 			
-	var tool_controller = get_node_or_null("../ToolController")
+	var tool_controller = get_node_or_null("ToolController")
 	if tool_controller:
 		if tool_controller.has_method("set_active_tool"):
 			tool_controller.set_active_tool(active_tool)
 		elif tool_controller.has_method("select_tool"):
 			tool_controller.select_tool(active_tool)
+			
+	var game_controller = get_node_or_null("../GameController")
+	if game_controller:
+		game_controller.active_tool = active_tool
+
+func refresh_hud() -> void:
+	if score_label:
+		score_label.text = "%d" % score
+	if level_label:
+		level_label.text = "Level %d" % level
+	if mode_label:
+		mode_label.text = mode
+	if accuracy_progress:
+		accuracy_progress.value = accuracy
+	if accuracy_label:
+		accuracy_label.text = "%d%%" % int(accuracy)
 
 func _add_slider(panel: Control, label_text: String, prop_name: String, min_val: float, max_val: float, step: float, tree_gen: Node, triggers_regen: bool) -> void:
 	var hbox = HBoxContainer.new()
@@ -579,18 +657,17 @@ func frame_tree() -> void:
 	
 	var center = bounds.get_center()
 	var tree_height = bounds.size.y
+	var tree_width = max(bounds.size.x, bounds.size.z)
+	var max_dim = max(tree_height, tree_width)
 	
 	var half_fov = deg_to_rad(fov * 0.5)
-	var required_dist = (tree_height * 0.55) / tan(half_fov)
+	var required_dist = (max_dim * 0.7) / tan(half_fov)
 	
-	var cam_dir = -global_transform.basis.z.normalized()
-	var horizontal = Vector3(cam_dir.x, 0, cam_dir.z).normalized()
-	if horizontal.length() < 0.01:
-		horizontal = Vector3(0, 0, -1)
+	var angle_rad = deg_to_rad(35.0)
+	var offset = Vector3(cos(angle_rad), 0.45, sin(angle_rad)).normalized() * required_dist
 	
-	position = center - horizontal * required_dist
-	position.y = center.y
-	look_at(center, Vector3.UP)
+	position = center + offset
+	look_at(center - Vector3(0, tree_height * 0.1, 0), Vector3.UP)
 
 func _validate_rule_ui(rule_text: String, status_label: Label) -> void:
 	var tree_gen = get_node_or_null("../TreeGenerator3D")

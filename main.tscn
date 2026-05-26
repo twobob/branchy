@@ -1,4 +1,4 @@
-[gd_scene format=3 uid="uid://b0t7w8j3k1q2c"]
+﻿[gd_scene format=3 uid="uid://b0t7w8j3k1q2c"]
 
 [ext_resource type="Script" uid="uid://biax656drt234" path="res://TreeGenerator3D.gd" id="1_a2b3c"]
 [ext_resource type="Script" uid="uid://csd7bj5vpwdg2" path="res://CameraController.gd" id="2_cmra1"]
@@ -46,12 +46,13 @@ vertical_falloff = 1.2
 branch_length_scale = 1.0
 collision_shape_type = 1
 capsule_wind_multiplier = 8.0
-stiffness = 0.5
-damping = 0.1
-wind_strength = 1.0
+stiffness = 30.0
+damping = 5.0
+wind_strength = 6.0
 wind_scale = 1.0
 wind_speed = 1.0
 seed = 30
 
 [node name="GameController" type="Node3D" parent="." unique_id=987654321]
 script = ExtResource("3_gctrl")
+

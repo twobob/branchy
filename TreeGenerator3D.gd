@@ -1,4 +1,4 @@
-extends Node3D
+﻿extends Node3D
 class_name TreeGenerator3D
 
 signal branch_pruned(branch_index: int)
@@ -372,6 +372,12 @@ func create_branch(origin: Vector3, trunk_dir: Vector3, height_ratio: float, dyn
 	anchor_col.shape = anchor_sphere
 	anchor.add_child(anchor_col)
 	
+	tip.set_meta("is_branch_tip", true)
+	if health == "diseased":
+		tip.set_meta("is_deadwood", true)
+	else:
+		tip.set_meta("is_deadwood", false)
+
 	branches.append({
 		"anchor": anchor,
 		"tip": tip,
