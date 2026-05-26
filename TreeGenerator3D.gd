@@ -439,7 +439,9 @@ func prune_branch(branch_index: int):
 		b.tip.collision_mask = 1
 		
 
-		var trunk_dir_out = (b.tip.global_position - global_position).normalized()
+		var tip_pos = b.tip.global_position if b.tip.is_inside_tree() else b.tip.position
+		var self_pos = global_position if is_inside_tree() else Vector3.ZERO
+		var trunk_dir_out = (tip_pos - self_pos).normalized()
 		trunk_dir_out.y = 0.2
 		var push_dir = (trunk_dir_out + Vector3(rng.randf_range(-0.3, 0.3), 0.1, rng.randf_range(-0.3, 0.3))).normalized()
 		b.tip.apply_central_impulse(push_dir * b.tip.mass * 2.0)
@@ -498,14 +500,15 @@ func set_debug_visible(on: bool) -> void:
 			m.visible = on
 
 func get_tree_bounds() -> AABB:
-	var bounds = AABB(global_position, Vector3.ZERO)
+	var start_pos = global_position if is_inside_tree() else Vector3.ZERO
+	var bounds = AABB(start_pos, Vector3.ZERO)
 	bounds = _expand_bounds_recursive(self, bounds)
 	return bounds
 
 func _expand_bounds_recursive(node: Node, bounds: AABB) -> AABB:
 	if node is MeshInstance3D and node.mesh:
 		var mesh_aabb = node.mesh.get_aabb()
-		var t = node.global_transform
+		var t = node.global_transform if node.is_inside_tree() else node.transform
 		for i in range(8):
 			var corner = Vector3(
 				mesh_aabb.position.x + mesh_aabb.size.x * (1 if i & 1 else 0),
