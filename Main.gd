@@ -1,4 +1,4 @@
-extends Node3D
+﻿extends Node3D
 
 
 
@@ -6,6 +6,7 @@ var score := 0
 var score_label: Label
 var tree_gen: TreeGenerator3D
 var camera: Camera3D
+var laser_dot: Node3D
 
 
 var leaf_mesh: BoxMesh
@@ -25,13 +26,28 @@ func _ready():
 	tree_gen = get_node_or_null("TreeGenerator3D")
 	camera = get_node_or_null("Camera3D")
 	
-	pass
-	
 	setup_ground_plane()
 	setup_wood_chipper()
-	pass #gui
-	pass #vfx
+	setup_vfx_assets()
+	setup_laser_dot()
 
+func setup_laser_dot():
+	var dot_mesh_inst = MeshInstance3D.new()
+	dot_mesh_inst.name = "LaserDot"
+	var sphere = SphereMesh.new()
+	sphere.radius = 0.03
+	sphere.height = 0.06
+	dot_mesh_inst.mesh = sphere
+	var mat = StandardMaterial3D.new()
+	mat.emission_enabled = true
+	mat.emission = Color.RED
+	mat.emission_energy_multiplier = 3.0
+	mat.albedo_color = Color.RED
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	dot_mesh_inst.material_override = mat
+	add_child(dot_mesh_inst)
+	laser_dot = dot_mesh_inst
+	laser_dot.visible = false
 
 func setup_ground_plane():
 	var ground = StaticBody3D.new()
@@ -266,7 +282,23 @@ func _process(delta: float):
 		saw_timer -= delta
 		if saw_timer <= 0.0:
 			saw_instance.visible = false
-			
+
+	if camera and laser_dot:
+		var vp = get_viewport()
+		var vp_size = vp.get_visible_rect().size
+		var center = vp_size * 0.5
+		var origin = camera.project_ray_origin(center)
+		var normal = camera.project_ray_normal(center)
+		var end = origin + normal * 2.0
+		var space_state = get_world_3d().direct_space_state
+		var query = PhysicsRayQueryParameters3D.create(origin, end)
+		query.collision_mask = 2
+		var result = space_state.intersect_ray(query)
+		if result:
+			laser_dot.global_position = result.position
+			laser_dot.visible = true
+		else:
+			laser_dot.visible = false
 
 	if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
 		var focus_owner = get_viewport().gui_get_focus_owner()

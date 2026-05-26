@@ -1,14 +1,12 @@
-extends Node3D
+﻿extends Node3D
 
 var active_tool_name: String = "none"
 var tool_holder: Node3D = null
 var current_model: Node3D = null
-
-var chainsaw_material_duplicated: bool = false
-var chainsaw_material_override: StandardMaterial3D = null
+var is_cutting: bool = false
 
 var tool_configs: Dictionary = {}
-var rest_pos: Vector3 = Vector3(0.35, -0.25, -0.6)
+var rest_pos: Vector3 = Vector3(0.35, -0.35, -0.55)
 
 func _ready() -> void:
 	tool_holder = Node3D.new()
@@ -20,9 +18,9 @@ func _ready() -> void:
 		"husqvarna": {
 			"scene_path": "res://assets/husqvarna_chainsaw_LP.obj",
 			"is_mesh": true,
-			"scale": Vector3(0.012, 0.012, 0.012),
-			"rotation_deg": Vector3(0, 0, 90),
-			"offset": Vector3(0, 0.15, 0),
+			"scale": Vector3(0.01, 0.01, 0.01),
+			"rotation_deg": Vector3(0, -90, 90),
+			"offset": Vector3.ZERO,
 			"type": "chainsaw"
 		},
 		"chainsaw": {
@@ -36,7 +34,7 @@ func _ready() -> void:
 		"animated_chainsaw": {
 			"scene_path": "res://assets/animated_chainsaw.glb",
 			"is_mesh": false,
-			"scale": Vector3(0.012, 0.012, 0.012),
+			"scale": Vector3(0.01, 0.01, 0.01),
 			"rotation_deg": Vector3(0, 180, 0),
 			"offset": Vector3.ZERO,
 			"type": "chainsaw"
@@ -52,8 +50,8 @@ func _ready() -> void:
 		"makita_outdoor": {
 			"scene_path": "res://assets/makita_outdoor.fbx",
 			"is_mesh": false,
-			"scale": Vector3(0.012, 0.012, 0.012),
-			"rotation_deg": Vector3(0, 0, 90),
+			"scale": Vector3(0.01, 0.01, 0.01),
+			"rotation_deg": Vector3(0, -90, 90),
 			"offset": Vector3.ZERO,
 			"type": "chainsaw"
 		},
@@ -64,16 +62,22 @@ func _ready() -> void:
 			"rotation_deg": Vector3(0, 90, 0),
 			"offset": Vector3.ZERO,
 			"type": "mini_saw"
+		},
+		"hands": {
+			"scene_path": "",
+			"is_mesh": false,
+			"scale": Vector3.ONE,
+			"rotation_deg": Vector3.ZERO,
+			"offset": Vector3.ZERO,
+			"type": "hands"
 		}
 	}
 
 func set_active_tool(tool_name: String) -> void:
-	active_tool_name = tool_name.to_lower()
+	active_tool_name = tool_name.to_lower().replace(" ", "_")
 	if is_instance_valid(current_model):
 		current_model.queue_free()
 		current_model = null
-	chainsaw_material_duplicated = false
-	chainsaw_material_override = null
 
 	if not tool_configs.has(active_tool_name):
 		for key in tool_configs:
@@ -85,13 +89,17 @@ func set_active_tool(tool_name: String) -> void:
 		return
 
 	var cfg = tool_configs[active_tool_name]
+
+	if cfg.scene_path == "":
+		return
+
 	var res = load(cfg.scene_path)
 	if not res:
 		return
 
 	if cfg.is_mesh and res is Mesh:
 		current_model = MeshInstance3D.new()
-		current_model.mesh = res
+		(current_model as MeshInstance3D).mesh = res
 	elif res is PackedScene:
 		current_model = res.instantiate()
 	else:
@@ -111,77 +119,27 @@ func get_tool_type() -> String:
 	return "none"
 
 func _process(delta: float) -> void:
-	var is_cutting = Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT)
+	is_cutting = Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT)
 	var time = Time.get_ticks_msec() / 1000.0
 
-	var camera = get_parent()
-	if not camera is Camera3D:
-		return
-	var vp = camera.get_viewport()
-	if not vp:
-		return
-	var mouse_pos = vp.get_mouse_position()
-	var vp_size = vp.get_visible_rect().size
-	if vp_size.x < 1.0 or vp_size.y < 1.0:
-		return
-
-	var ndc_x = (mouse_pos.x / vp_size.x - 0.5) * 2.0
-	var ndc_y = -(mouse_pos.y / vp_size.y - 0.5) * 2.0
-
-	var pivot = Vector3(0.4, -0.3, -0.25)
-	var aim_point = Vector3(ndc_x * 0.35, ndc_y * 0.25, -1.2)
-	var arm_dir = (aim_point - pivot).normalized()
-
-	var pitch = asin(clamp(-arm_dir.y, -0.8, 0.8))
-	var yaw = atan2(arm_dir.x, -arm_dir.z)
-
-	var target_rot = Vector3(pitch, yaw, 0.0)
-	var target_pos = pivot
-
-	var bob_y = sin(time * 2.0) * 0.006
-	var bob_x = cos(time * 1.3) * 0.004
+	var target_pos = rest_pos
+	var bob_y = sin(time * 2.0) * 0.005
+	var bob_x = cos(time * 1.3) * 0.003
 	target_pos += Vector3(bob_x, bob_y, 0.0)
 
 	if is_cutting:
-		target_pos.z -= 0.15
-		var vib = Vector3(randf_range(-0.006, 0.006), randf_range(-0.006, 0.006), 0.0)
+		target_pos.z -= 0.1
+		var vib = Vector3(
+			randf_range(-0.005, 0.005),
+			randf_range(-0.005, 0.005),
+			0.0
+		)
 		target_pos += vib
 
-	tool_holder.position = tool_holder.position.lerp(target_pos, 12.0 * delta)
-	tool_holder.rotation.x = lerp_angle(tool_holder.rotation.x, target_rot.x, 12.0 * delta)
-	tool_holder.rotation.y = lerp_angle(tool_holder.rotation.y, target_rot.y, 12.0 * delta)
-	tool_holder.rotation.z = lerp_angle(tool_holder.rotation.z, 0.0, 12.0 * delta)
+	tool_holder.position = tool_holder.position.lerp(target_pos, 10.0 * delta)
 
-	if get_tool_type() == "chainsaw" and is_instance_valid(current_model):
-		var mesh_inst: MeshInstance3D = null
-		if current_model is MeshInstance3D:
-			mesh_inst = current_model
-		else:
-			for child in current_model.get_children():
-				if child is MeshInstance3D:
-					mesh_inst = child
-					break
-				for sub in child.get_children():
-					if sub is MeshInstance3D:
-						mesh_inst = sub
-						break
-					for sub2 in sub.get_children():
-						if sub2 is MeshInstance3D:
-							mesh_inst = sub2
-							break
-		if mesh_inst:
-			if not chainsaw_material_duplicated:
-				var mat = mesh_inst.get_active_material(0)
-				if mat:
-					chainsaw_material_override = mat.duplicate()
-					mesh_inst.material_override = chainsaw_material_override
-					chainsaw_material_duplicated = true
-			if chainsaw_material_override:
-				var speed = 22.0 if is_cutting else 0.0
-				chainsaw_material_override.uv1_offset += Vector3(speed * delta, speed * delta, 0.0)
-
-	elif get_tool_type() == "mini_saw" and is_instance_valid(current_model):
-		var blade = current_model.get_node_or_null("texture_pbr_v128")
-		if blade:
-			var speed = 40.0 if is_cutting else 0.0
-			blade.rotate_object_local(Vector3.RIGHT, speed * delta)
+	if get_tool_type() == "mini_saw" and is_instance_valid(current_model):
+		for child in current_model.get_children():
+			if child is MeshInstance3D:
+				var speed = 40.0 if is_cutting else 0.0
+				child.rotate_object_local(Vector3.RIGHT, speed * delta)
