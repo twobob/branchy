@@ -302,7 +302,7 @@ func create_branch(origin: Vector3, trunk_dir: Vector3, height_ratio: float, dyn
 	branch_root.add_child(tip)
 	tip.name = "Tip"
 	
-	# Active tree branches: Collision Layer 2, Collision Mask 0 (ignores other physics, only hit by tools/raycasts)
+
 	tip.collision_layer = 2
 	tip.collision_mask = 0
 	
@@ -434,17 +434,17 @@ func prune_branch(branch_index: int):
 		b.joint.queue_free()
 	if is_instance_valid(b.tip):
 		b.tip.gravity_scale = 1.0
-		# Severed debris: Collision Layer 4 (value 8), Collision Mask 1 (collides only with ground plane/chipper)
+
 		b.tip.collision_layer = 8
 		b.tip.collision_mask = 1
 		
-		# Apply a small outward push/impulse
+
 		var trunk_dir_out = (b.tip.global_position - global_position).normalized()
 		trunk_dir_out.y = 0.2
 		var push_dir = (trunk_dir_out + Vector3(rng.randf_range(-0.3, 0.3), 0.1, rng.randf_range(-0.3, 0.3))).normalized()
 		b.tip.apply_central_impulse(push_dir * b.tip.mass * 2.0)
 		
-		# Contact monitoring to start the 1.5s fade out when hitting ground
+
 		b.tip.contact_monitor = true
 		b.tip.max_contacts_reported = 2
 		b.tip.body_entered.connect(func(body):

@@ -95,7 +95,7 @@ func _process(delta: float) -> void:
 	
 	var target_local_pos = rest_local_pos + vibration
 	var target_global_pos = camera.global_position + camera.global_basis * target_local_pos
-	var target_global_quat = Quaternion(camera.global_basis * Basis(rest_local_rot))
+	var target_global_quat = Quaternion(camera.global_basis * Basis.from_euler(rest_local_rot))
 	
 	global_position = global_position.lerp(target_global_pos, sway_speed * delta)
 	global_transform.basis = Basis(Quaternion(global_transform.basis).slerp(target_global_quat, sway_speed * delta))
