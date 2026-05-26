@@ -2,187 +2,228 @@ extends Camera3D
 
 @export var move_speed: float = 10.0
 
+var sound_synthesizer: Node
+var active_tool: String = "Hands"
+var tool_cards: Dictionary = {}
+var drawer_open: bool = false
+var drawer_panel: PanelContainer
+
+var score: int = 12450
+var level: int = 3
+var mode: String = "Zen Pruning"
+var accuracy: float = 84.0
+
+var spin_x: SpinBox
+var spin_y: SpinBox
+var spin_z: SpinBox
+
+var style_btn_normal: StyleBoxFlat
+var style_btn_hover: StyleBoxFlat
+var style_btn_pressed: StyleBoxFlat
+var style_active_card: StyleBoxFlat
+var style_inactive_card: StyleBoxFlat
+
+var score_label: Label
+var level_label: Label
+var mode_label: Label
+var accuracy_progress: ProgressBar
+var accuracy_label: Label
+
 func _ready() -> void:
-	var canvas := CanvasLayer.new()
+	var synth_script = load("res://SoundSynthesiser.gd")
+	if synth_script:
+		sound_synthesizer = synth_script.new()
+		add_child(sound_synthesizer)
+		
+	var canvas = CanvasLayer.new()
 	canvas.name = "CanvasLayer"
 	add_child(canvas)
 	
-	var fps_label := Label.new()
-	fps_label.name = "FPSLabel"
-	fps_label.position = Vector2(10, 10)
-	fps_label.add_theme_color_override("font_color", Color.WHITE)
-	fps_label.add_theme_font_size_override("font_size", 24)
-	canvas.add_child(fps_label)
-	var scroll = ScrollContainer.new()
-	scroll.name = "ScrollContainer"
-	scroll.position = Vector2(10, 50)
-	scroll.size = Vector2(320, 600)
-	canvas.add_child(scroll)
+	style_btn_normal = _create_glass_style(Color(0.14, 0.14, 0.18, 0.8), Color(1.0, 1.0, 1.0, 0.1), 8)
+	style_btn_hover = _create_glass_style(Color(0.46, 0.76, 0.54, 0.25), Color(0.46, 0.76, 0.54, 0.8), 8)
+	style_btn_pressed = _create_glass_style(Color(0.46, 0.76, 0.54, 0.4), Color(0.85, 0.67, 0.28, 1.0), 8)
+	style_active_card = _create_glass_style(Color(0.46, 0.76, 0.54, 0.18), Color(0.85, 0.67, 0.28, 1.0), 12)
+	style_inactive_card = _create_glass_style(Color(0.08, 0.08, 0.1, 0.5), Color(1.0, 1.0, 1.0, 0.08), 12)
 	
-	var panel = VBoxContainer.new()
-	panel.name = "UIPanel"
-	scroll.add_child(panel)
-
-	var top_right_panel = VBoxContainer.new()
-	top_right_panel.name = "TopRightPanel"
-	top_right_panel.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-	top_right_panel.position = Vector2(-200, 10)
-	top_right_panel.alignment = BoxContainer.ALIGNMENT_END
-	canvas.add_child(top_right_panel)
-
+	var fps_label = Label.new()
+	fps_label.name = "FPSLabel"
+	fps_label.position = Vector2(360, 20)
+	fps_label.add_theme_color_override("font_color", Color(0.65, 0.65, 0.7, 1.0))
+	fps_label.add_theme_font_size_override("font_size", 14)
+	canvas.add_child(fps_label)
+	
+	var dev_toggle = Button.new()
+	dev_toggle.name = "DevToggleBtn"
+	dev_toggle.text = "? DEVELOPER"
+	dev_toggle.custom_minimum_size = Vector2(130, 40)
+	dev_toggle.position = Vector2(15, 15)
+	dev_toggle.add_theme_stylebox_override("normal", style_btn_normal)
+	dev_toggle.add_theme_stylebox_override("hover", style_btn_hover)
+	dev_toggle.add_theme_stylebox_override("pressed", style_btn_pressed)
+	dev_toggle.add_theme_color_override("font_color", Color.WHITE)
+	canvas.add_child(dev_toggle)
+	_setup_btn_anims(dev_toggle)
+	dev_toggle.pressed.connect(toggle_drawer)
+	
+	drawer_panel = PanelContainer.new()
+	drawer_panel.name = "DrawerPanel"
+	drawer_panel.custom_minimum_size = Vector2(340, 0)
+	drawer_panel.set_anchors_preset(Control.PRESET_LEFT_WIDE)
+	drawer_panel.grow_horizontal = Control.GROW_DIRECTION_END
+	drawer_panel.position = Vector2(-340, 0)
+	
+	var drawer_style = _create_glass_style(Color(0.06, 0.06, 0.08, 0.94), Color(1.0, 1.0, 1.0, 0.15), 0)
+	drawer_style.corner_radius_top_right = 16
+	drawer_style.corner_radius_bottom_right = 16
+	drawer_panel.add_theme_stylebox_override("panel", drawer_style)
+	canvas.add_child(drawer_panel)
+	
+	var drawer_margin = MarginContainer.new()
+	drawer_margin.add_theme_constant_override("margin_left", 15)
+	drawer_margin.add_theme_constant_override("margin_right", 15)
+	drawer_margin.add_theme_constant_override("margin_top", 70)
+	drawer_margin.add_theme_constant_override("margin_bottom", 15)
+	drawer_panel.add_child(drawer_margin)
+	
+	var drawer_scroll = ScrollContainer.new()
+	drawer_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	drawer_margin.add_child(drawer_scroll)
+	
+	var drawer_vbox = VBoxContainer.new()
+	drawer_vbox.add_theme_constant_override("separation", 15)
+	drawer_scroll.add_child(drawer_vbox)
+	
+	var header_lbl = Label.new()
+	header_lbl.text = "DEVELOPER CONSOLE"
+	header_lbl.add_theme_color_override("font_color", Color(0.85, 0.67, 0.28, 1.0))
+	header_lbl.add_theme_font_size_override("font_size", 16)
+	drawer_vbox.add_child(header_lbl)
+	
+	var tree_gen = get_node_or_null("../TreeGenerator3D")
+	
+	var pos_lbl = Label.new()
+	pos_lbl.text = "Camera Position:"
+	pos_lbl.add_theme_color_override("font_color", Color(0.65, 0.65, 0.7, 1.0))
+	drawer_vbox.add_child(pos_lbl)
+	
 	for axis in ["x", "y", "z"]:
 		var hbox = HBoxContainer.new()
-		hbox.name = "HBox" + axis.to_upper()
-		hbox.alignment = BoxContainer.ALIGNMENT_END
-		top_right_panel.add_child(hbox)
-		
-		var label = Label.new()
-		label.text = "Pos " + axis.to_upper() + ":"
-		label.custom_minimum_size = Vector2(60, 0)
-		hbox.add_child(label)
-		
+		drawer_vbox.add_child(hbox)
+		var lbl = Label.new()
+		lbl.text = axis.to_upper() + ":"
+		lbl.custom_minimum_size = Vector2(40, 0)
+		hbox.add_child(lbl)
 		var spin = SpinBox.new()
-		spin.name = "Spin" + axis.to_upper()
 		spin.min_value = -10000.0
 		spin.max_value = 10000.0
 		spin.step = 0.1
-		spin.custom_minimum_size = Vector2(120, 0)
+		spin.custom_minimum_size = Vector2(180, 0)
 		spin.focus_mode = Control.FOCUS_CLICK
 		spin.get_line_edit().focus_mode = Control.FOCUS_CLICK
-		
-		var line_edit = spin.get_line_edit()
-		line_edit.text_submitted.connect(func(_text): line_edit.release_focus())
-		
+		spin.get_line_edit().text_submitted.connect(func(_text): spin.get_line_edit().release_focus())
 		hbox.add_child(spin)
 		spin.value_changed.connect(_on_pos_changed.bind(axis))
+		if axis == "x": spin_x = spin
+		elif axis == "y": spin_y = spin
+		elif axis == "z": spin_z = spin
 		
 	var seed_hbox = HBoxContainer.new()
-	seed_hbox.name = "HBoxSEED"
-	panel.add_child(seed_hbox)
-	
-	var seed_label = Label.new()
-	seed_label.text = "Seed:"
-	seed_label.custom_minimum_size = Vector2(60, 0)
-	seed_hbox.add_child(seed_label)
-	
+	drawer_vbox.add_child(seed_hbox)
+	var seed_lbl = Label.new()
+	seed_lbl.text = "Seed:"
+	seed_lbl.custom_minimum_size = Vector2(60, 0)
+	seed_hbox.add_child(seed_lbl)
 	var seed_spin = SpinBox.new()
-	seed_spin.name = "SpinSEED"
 	seed_spin.min_value = 0
 	seed_spin.max_value = 100000
 	seed_spin.step = 1
 	seed_spin.custom_minimum_size = Vector2(120, 0)
 	seed_spin.focus_mode = Control.FOCUS_CLICK
 	seed_spin.get_line_edit().focus_mode = Control.FOCUS_CLICK
-	
-	var seed_line_edit = seed_spin.get_line_edit()
-	seed_line_edit.text_submitted.connect(func(_text): seed_line_edit.release_focus())
-	
+	seed_spin.get_line_edit().text_submitted.connect(func(_text): seed_spin.get_line_edit().release_focus())
 	seed_hbox.add_child(seed_spin)
-	
-	var tree_gen = get_node_or_null("../TreeGenerator3D")
 	if tree_gen:
 		seed_spin.set_value_no_signal(tree_gen.seed)
-	
 	seed_spin.value_changed.connect(_on_seed_changed)
-
-	var debug_hbox = HBoxContainer.new()
-	debug_hbox.name = "HBoxDEBUG"
-	panel.add_child(debug_hbox)
 	
-	var debug_label = Label.new()
-	debug_label.text = "Show Collisions:"
-	debug_label.custom_minimum_size = Vector2(120, 0)
-	debug_hbox.add_child(debug_label)
-	
-	var debug_check = CheckBox.new()
-	debug_check.name = "CheckDEBUG"
-	debug_check.focus_mode = Control.FOCUS_CLICK
+	var col_hbox = HBoxContainer.new()
+	drawer_vbox.add_child(col_hbox)
+	var col_lbl = Label.new()
+	col_lbl.text = "Collisions:"
+	col_lbl.custom_minimum_size = Vector2(120, 0)
+	col_hbox.add_child(col_lbl)
+	var col_check = CheckBox.new()
+	col_check.focus_mode = Control.FOCUS_CLICK
 	if tree_gen:
-		debug_check.button_pressed = tree_gen.show_debug
+		col_check.button_pressed = tree_gen.show_debug
 	else:
-		debug_check.button_pressed = true
-	debug_hbox.add_child(debug_check)
+		col_check.button_pressed = true
+	col_hbox.add_child(col_check)
+	col_check.toggled.connect(_on_debug_toggled)
 	
-	debug_check.toggled.connect(_on_debug_toggled)
-
 	var shape_hbox = HBoxContainer.new()
-	shape_hbox.name = "HBoxSHAPE"
-	panel.add_child(shape_hbox)
-	
-	var shape_label = Label.new()
-	shape_label.text = "Shape:"
-	shape_label.custom_minimum_size = Vector2(120, 0)
-	shape_hbox.add_child(shape_label)
-	
+	drawer_vbox.add_child(shape_hbox)
+	var shape_lbl = Label.new()
+	shape_lbl.text = "Shape:"
+	shape_lbl.custom_minimum_size = Vector2(120, 0)
+	shape_hbox.add_child(shape_lbl)
 	var shape_opt = OptionButton.new()
-	shape_opt.name = "OptSHAPE"
 	shape_opt.add_item("Capsule", 0)
 	shape_opt.add_item("Sphere", 1)
 	shape_opt.focus_mode = Control.FOCUS_CLICK
-	
 	if tree_gen:
 		shape_opt.selected = tree_gen.collision_shape_type
-		
 	shape_hbox.add_child(shape_opt)
 	shape_opt.item_selected.connect(_on_shape_toggled)
 	
-	var self_col_hbox = HBoxContainer.new()
-	self_col_hbox.name = "HBoxSELFCOL"
-	panel.add_child(self_col_hbox)
-	
-	var self_col_label = Label.new()
-	self_col_label.text = "Self-Collision:"
-	self_col_label.custom_minimum_size = Vector2(120, 0)
-	self_col_hbox.add_child(self_col_label)
-	
-	var self_col_check = CheckBox.new()
-	self_col_check.name = "CheckSELFCOL"
-	self_col_check.focus_mode = Control.FOCUS_CLICK
-	
+	var self_hbox = HBoxContainer.new()
+	drawer_vbox.add_child(self_hbox)
+	var self_lbl = Label.new()
+	self_lbl.text = "Self-Collision:"
+	self_lbl.custom_minimum_size = Vector2(120, 0)
+	self_hbox.add_child(self_lbl)
+	var self_check = CheckBox.new()
+	self_check.focus_mode = Control.FOCUS_CLICK
 	if tree_gen:
-		self_col_check.button_pressed = tree_gen.enable_self_collision
-		
-	self_col_hbox.add_child(self_col_check)
-	self_col_check.toggled.connect(_on_self_col_toggled)
+		self_check.button_pressed = tree_gen.enable_self_collision
+	self_hbox.add_child(self_check)
+	self_check.toggled.connect(_on_self_col_toggled)
 	
-	var rule_label = Label.new()
-	rule_label.text = "Rule X:"
-	panel.add_child(rule_label)
+	var rule_sec_lbl = Label.new()
+	rule_sec_lbl.text = "L-System Rule X:"
+	rule_sec_lbl.add_theme_color_override("font_color", Color(0.65, 0.65, 0.7, 1.0))
+	drawer_vbox.add_child(rule_sec_lbl)
 	
 	var rule_hbox = HBoxContainer.new()
-	rule_hbox.name = "HBoxRULE"
-	panel.add_child(rule_hbox)
-	
+	drawer_vbox.add_child(rule_hbox)
 	var rule_edit = LineEdit.new()
-	rule_edit.name = "RuleXEdit"
-	rule_edit.custom_minimum_size = Vector2(200, 0)
+	rule_edit.custom_minimum_size = Vector2(180, 0)
 	rule_edit.focus_mode = Control.FOCUS_CLICK
 	if tree_gen:
 		rule_edit.text = tree_gen.rule_X
 	rule_hbox.add_child(rule_edit)
-	
-	var randomize_btn = Button.new()
-	randomize_btn.name = "RandomizeBtn"
-	randomize_btn.text = "Rand"
-	randomize_btn.focus_mode = Control.FOCUS_CLICK
-	rule_hbox.add_child(randomize_btn)
+	var rand_btn = Button.new()
+	rand_btn.text = "Rand"
+	rand_btn.custom_minimum_size = Vector2(50, 30)
+	rand_btn.add_theme_stylebox_override("normal", style_btn_normal)
+	rand_btn.add_theme_stylebox_override("hover", style_btn_hover)
+	rand_btn.add_theme_stylebox_override("pressed", style_btn_pressed)
+	rule_hbox.add_child(rand_btn)
+	_setup_btn_anims(rand_btn)
 	
 	var rule_status = Label.new()
-	rule_status.name = "RuleStatus"
 	rule_status.text = "Valid"
 	rule_status.add_theme_color_override("font_color", Color.GREEN)
-	panel.add_child(rule_status)
+	drawer_vbox.add_child(rule_status)
 	
 	rule_edit.text_submitted.connect(func(new_text: String):
 		_apply_rule(new_text, rule_edit, rule_status)
 		rule_edit.release_focus()
 	)
-	
 	rule_edit.text_changed.connect(func(new_text: String):
 		_validate_rule_ui(new_text, rule_status)
 	)
-	
-	randomize_btn.pressed.connect(func():
+	rand_btn.pressed.connect(func():
 		if tree_gen:
 			for _attempt in range(20):
 				var new_rule = tree_gen.randomize_rule_x()
@@ -197,29 +238,201 @@ func _ready() -> void:
 			await get_tree().process_frame
 			frame_tree()
 	)
-
-	_add_slider(panel, "Iterations", "iterations", 1, 10, 1, tree_gen, true)
-	_add_slider(panel, "Segment Len", "segment_length", 0.1, 8.0, 0.1, tree_gen, true)
-	_add_slider(panel, "Branch Angle", "angle_deg", 5.0, 80.0, 1.0, tree_gen, true)
-	_add_slider(panel, "Thickness", "branch_thickness", 0.05, 2.0, 0.05, tree_gen, true)
-	_add_slider(panel, "Thickness Taper", "thickness_taper", 0.0, 0.5, 0.01, tree_gen, true)
-	_add_slider(panel, "Base Offset", "base_branch_offset", 0.0, 1.0, 0.05, tree_gen, true)
-	_add_slider(panel, "Vertical Falloff", "vertical_falloff", 0.1, 5.0, 0.1, tree_gen, true)
-	_add_slider(panel, "Branch Scaling", "branch_length_scale", 0.1, 3.0, 0.1, tree_gen, true)
 	
-	_add_slider(panel, "Stiffness", "stiffness", 0.0, 200.0, 0.1, tree_gen, true)
-	_add_slider(panel, "Damping", "damping", 0.0, 50.0, 0.1, tree_gen, true)
-
-	var legend_panel = VBoxContainer.new()
+	_add_slider(drawer_vbox, "Iterations", "iterations", 1, 10, 1, tree_gen, true)
+	_add_slider(drawer_vbox, "Segment Len", "segment_length", 0.1, 8.0, 0.1, tree_gen, true)
+	_add_slider(drawer_vbox, "Branch Angle", "angle_deg", 5.0, 80.0, 1.0, tree_gen, true)
+	_add_slider(drawer_vbox, "Thickness", "branch_thickness", 0.05, 2.0, 0.05, tree_gen, true)
+	_add_slider(drawer_vbox, "Thickness Taper", "thickness_taper", 0.0, 0.5, 0.01, tree_gen, true)
+	_add_slider(drawer_vbox, "Base Offset", "base_branch_offset", 0.0, 1.0, 0.05, tree_gen, true)
+	_add_slider(drawer_vbox, "Vertical Falloff", "vertical_falloff", 0.1, 5.0, 0.1, tree_gen, true)
+	_add_slider(drawer_vbox, "Branch Scaling", "branch_length_scale", 0.1, 3.0, 0.1, tree_gen, true)
+	_add_slider(drawer_vbox, "Stiffness", "stiffness", 0.0, 200.0, 0.1, tree_gen, true)
+	_add_slider(drawer_vbox, "Damping", "damping", 0.0, 50.0, 0.1, tree_gen, true)
+	
+	var wind_header = Label.new()
+	wind_header.text = "WIND & ENVIRONMENT"
+	wind_header.add_theme_color_override("font_color", Color(0.85, 0.67, 0.28, 1.0))
+	wind_header.add_theme_font_size_override("font_size", 14)
+	drawer_vbox.add_child(wind_header)
+	
+	_add_slider(drawer_vbox, "Wind Strength", "wind_strength", 0.0, 200.0, 1.0, tree_gen, false)
+	_add_slider(drawer_vbox, "Wind Scale", "wind_scale", 0.1, 20.0, 0.1, tree_gen, false)
+	_add_slider(drawer_vbox, "Wind Speed", "wind_speed", 0.0, 20.0, 0.1, tree_gen, false)
+	_add_slider(drawer_vbox, "Capsule Wind x", "capsule_wind_multiplier", 1.0, 50.0, 0.5, tree_gen, false)
+	
+	var top_panel = PanelContainer.new()
+	top_panel.name = "TopPanel"
+	top_panel.custom_minimum_size = Vector2(720, 80)
+	top_panel.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	top_panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	top_panel.position = Vector2(-360, 15)
+	var top_style = _create_glass_style(Color(0.08, 0.08, 0.1, 0.65), Color(1.0, 1.0, 1.0, 0.15), 12)
+	top_panel.add_theme_stylebox_override("panel", top_style)
+	canvas.add_child(top_panel)
+	
+	var top_margin = MarginContainer.new()
+	top_margin.add_theme_constant_override("margin_left", 20)
+	top_margin.add_theme_constant_override("margin_right", 20)
+	top_panel.add_child(top_margin)
+	
+	var top_hbox = HBoxContainer.new()
+	top_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	top_hbox.add_theme_constant_override("separation", 40)
+	top_margin.add_child(top_hbox)
+	
+	var mode_vbox = VBoxContainer.new()
+	mode_vbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	top_hbox.add_child(mode_vbox)
+	var mode_title = Label.new()
+	mode_title.text = "GAME MODE"
+	mode_title.add_theme_color_override("font_color", Color(0.65, 0.65, 0.7, 1.0))
+	mode_title.add_theme_font_size_override("font_size", 10)
+	mode_vbox.add_child(mode_title)
+	mode_label = Label.new()
+	mode_label.text = mode
+	mode_label.add_theme_color_override("font_color", Color(0.46, 0.76, 0.54, 1.0))
+	mode_label.add_theme_font_size_override("font_size", 16)
+	mode_vbox.add_child(mode_label)
+	
+	var lvl_vbox = VBoxContainer.new()
+	lvl_vbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	top_hbox.add_child(lvl_vbox)
+	var lvl_title = Label.new()
+	lvl_title.text = "CURRENT LEVEL"
+	lvl_title.add_theme_color_override("font_color", Color(0.65, 0.65, 0.7, 1.0))
+	lvl_title.add_theme_font_size_override("font_size", 10)
+	lvl_vbox.add_child(lvl_title)
+	level_label = Label.new()
+	level_label.text = "Level %d" % level
+	level_label.add_theme_color_override("font_color", Color(0.85, 0.67, 0.28, 1.0))
+	level_label.add_theme_font_size_override("font_size", 16)
+	lvl_vbox.add_child(level_label)
+	
+	var score_vbox = VBoxContainer.new()
+	score_vbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	top_hbox.add_child(score_vbox)
+	var score_title = Label.new()
+	score_title.text = "TOTAL SCORE"
+	score_title.add_theme_color_override("font_color", Color(0.65, 0.65, 0.7, 1.0))
+	score_title.add_theme_font_size_override("font_size", 10)
+	score_vbox.add_child(score_title)
+	score_label = Label.new()
+	score_label.text = "%d" % score
+	score_label.add_theme_color_override("font_color", Color.WHITE)
+	score_label.add_theme_font_size_override("font_size", 16)
+	score_vbox.add_child(score_label)
+	
+	var acc_vbox = VBoxContainer.new()
+	acc_vbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	top_hbox.add_child(acc_vbox)
+	var acc_title = Label.new()
+	acc_title.text = "MATCH ACCURACY"
+	acc_title.add_theme_color_override("font_color", Color(0.65, 0.65, 0.7, 1.0))
+	acc_title.add_theme_font_size_override("font_size", 10)
+	acc_vbox.add_child(acc_title)
+	var acc_hbox = HBoxContainer.new()
+	acc_hbox.add_theme_constant_override("separation", 10)
+	acc_vbox.add_child(acc_hbox)
+	
+	accuracy_progress = ProgressBar.new()
+	accuracy_progress.min_value = 0
+	accuracy_progress.max_value = 100
+	accuracy_progress.value = accuracy
+	accuracy_progress.show_percentage = false
+	accuracy_progress.custom_minimum_size = Vector2(120, 10)
+	accuracy_progress.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	var pg_bg = StyleBoxFlat.new()
+	pg_bg.bg_color = Color(1, 1, 1, 0.05)
+	pg_bg.corner_radius_top_left = 5
+	pg_bg.corner_radius_top_right = 5
+	pg_bg.corner_radius_bottom_left = 5
+	pg_bg.corner_radius_bottom_right = 5
+	accuracy_progress.add_theme_stylebox_override("background", pg_bg)
+	var pg_fg = StyleBoxFlat.new()
+	pg_fg.bg_color = Color(0.46, 0.76, 0.54, 0.85)
+	pg_fg.corner_radius_top_left = 5
+	pg_fg.corner_radius_top_right = 5
+	pg_fg.corner_radius_bottom_left = 5
+	pg_fg.corner_radius_bottom_right = 5
+	accuracy_progress.add_theme_stylebox_override("fill", pg_fg)
+	acc_hbox.add_child(accuracy_progress)
+	
+	accuracy_label = Label.new()
+	accuracy_label.text = "%d%%" % int(accuracy)
+	accuracy_label.add_theme_color_override("font_color", Color(0.46, 0.76, 0.54, 1.0))
+	accuracy_label.add_theme_font_size_override("font_size", 14)
+	acc_hbox.add_child(accuracy_label)
+	
+	var tool_bar = PanelContainer.new()
+	tool_bar.name = "ToolBar"
+	tool_bar.custom_minimum_size = Vector2(520, 100)
+	tool_bar.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+	tool_bar.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	tool_bar.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	tool_bar.position = Vector2(-260, -120)
+	var tool_bar_style = _create_glass_style(Color(0.06, 0.06, 0.08, 0.75), Color(1.0, 1.0, 1.0, 0.18), 16)
+	tool_bar.add_theme_stylebox_override("panel", tool_bar_style)
+	canvas.add_child(tool_bar)
+	
+	var tool_margin = MarginContainer.new()
+	tool_margin.add_theme_constant_override("margin_left", 15)
+	tool_margin.add_theme_constant_override("margin_right", 15)
+	tool_bar.add_child(tool_margin)
+	
+	var tool_hbox = HBoxContainer.new()
+	tool_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	tool_hbox.add_theme_constant_override("separation", 15)
+	tool_margin.add_child(tool_hbox)
+	
+	var tools_list = ["Chainsaw", "Mini-Saw", "Pruning Shears", "Hands"]
+	var tool_emojis = {
+		"Chainsaw": "??",
+		"Mini-Saw": "?",
+		"Pruning Shears": "??",
+		"Hands": "???"
+	}
+	
+	for t_name in tools_list:
+		var btn = Button.new()
+		btn.text = tool_emojis[t_name] + " " + t_name
+		btn.custom_minimum_size = Vector2(110, 70)
+		btn.add_theme_stylebox_override("normal", style_inactive_card)
+		btn.add_theme_stylebox_override("hover", style_btn_hover)
+		btn.add_theme_stylebox_override("pressed", style_btn_pressed)
+		btn.add_theme_color_override("font_color", Color.WHITE)
+		btn.add_theme_font_size_override("font_size", 12)
+		tool_hbox.add_child(btn)
+		tool_cards[t_name] = btn
+		_setup_btn_anims(btn)
+		btn.pressed.connect(select_tool.bind(t_name))
+		
+	select_tool("Hands")
+	
+	var legend_panel = PanelContainer.new()
 	legend_panel.name = "LegendPanel"
+	legend_panel.custom_minimum_size = Vector2(200, 180)
 	legend_panel.set_anchors_preset(Control.PRESET_CENTER_RIGHT)
-	legend_panel.position = Vector2(-220, -80)
+	legend_panel.position = Vector2(-220, -90)
+	var legend_style = _create_glass_style(Color(0.08, 0.08, 0.1, 0.6), Color(1.0, 1.0, 1.0, 0.12), 12)
+	legend_panel.add_theme_stylebox_override("panel", legend_style)
 	canvas.add_child(legend_panel)
+	
+	var legend_margin = MarginContainer.new()
+	legend_margin.add_theme_constant_override("margin_left", 15)
+	legend_margin.add_theme_constant_override("margin_right", 15)
+	legend_margin.add_theme_constant_override("margin_top", 10)
+	legend_margin.add_theme_constant_override("margin_bottom", 10)
+	legend_panel.add_child(legend_margin)
+	
+	var legend_vbox = VBoxContainer.new()
+	legend_margin.add_child(legend_vbox)
 	
 	var legend_title = Label.new()
 	legend_title.text = "Camera Controls"
-	legend_title.add_theme_font_size_override("font_size", 18)
-	legend_panel.add_child(legend_title)
+	legend_title.add_theme_color_override("font_color", Color(0.85, 0.67, 0.28, 1.0))
+	legend_title.add_theme_font_size_override("font_size", 14)
+	legend_vbox.add_child(legend_title)
 	
 	var keys = [
 		"W/S - Forward / Back",
@@ -231,32 +444,98 @@ func _ready() -> void:
 	for k in keys:
 		var lbl = Label.new()
 		lbl.text = k
-		lbl.add_theme_font_size_override("font_size", 14)
-		legend_panel.add_child(lbl)
-
-	var bottom_right_panel = VBoxContainer.new()
-	bottom_right_panel.name = "BottomRightPanel"
-	bottom_right_panel.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
-	bottom_right_panel.position = Vector2(-300, -150)
-	canvas.add_child(bottom_right_panel)
-	
-	_add_slider(bottom_right_panel, "Wind Strength", "wind_strength", 0.0, 200.0, 1.0, tree_gen, false)
-	_add_slider(bottom_right_panel, "Wind Scale", "wind_scale", 0.1, 20.0, 0.1, tree_gen, false)
-	_add_slider(bottom_right_panel, "Wind Speed", "wind_speed", 0.0, 20.0, 0.1, tree_gen, false)
-	_add_slider(bottom_right_panel, "Capsule Wind x", "capsule_wind_multiplier", 1.0, 50.0, 0.5, tree_gen, false)
-
+		lbl.add_theme_color_override("font_color", Color(0.65, 0.65, 0.7, 1.0))
+		lbl.add_theme_font_size_override("font_size", 11)
+		legend_vbox.add_child(lbl)
+		
 	await get_tree().process_frame
 	await get_tree().process_frame
 	frame_tree()
 
-func _add_slider(panel: Control, label_text: String, prop_name: String, min_val: float, max_val: float, step: float, tree_gen: Node, triggers_regen: bool):
+func _create_glass_style(bg_col: Color, border_col: Color, radius: int) -> StyleBoxFlat:
+	var style = StyleBoxFlat.new()
+	style.bg_color = bg_col
+	style.border_width_left = 1
+	style.border_width_top = 1
+	style.border_width_right = 1
+	style.border_width_bottom = 1
+	style.border_color = border_col
+	style.corner_radius_top_left = radius
+	style.corner_radius_top_right = radius
+	style.corner_radius_bottom_left = radius
+	style.corner_radius_bottom_right = radius
+	style.shadow_color = Color(0, 0, 0, 0.2)
+	style.shadow_size = 6
+	style.shadow_offset = Vector2(0, 3)
+	return style
+
+func _setup_btn_anims(btn: Control) -> void:
+	btn.pivot_offset = btn.custom_minimum_size / 2.0
+	btn.mouse_entered.connect(func():
+		var tween = btn.create_tween()
+		tween.tween_property(btn, "scale", Vector2(1.06, 1.06), 0.15).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	)
+	btn.mouse_exited.connect(func():
+		var tween = btn.create_tween()
+		tween.tween_property(btn, "scale", Vector2(1.0, 1.0), 0.15).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	)
+	btn.button_down.connect(func():
+		var tween = btn.create_tween()
+		tween.tween_property(btn, "scale", Vector2(0.94, 0.94), 0.08).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	)
+	btn.button_up.connect(func():
+		var tween = btn.create_tween()
+		tween.tween_property(btn, "scale", Vector2(1.0, 1.0), 0.15).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	)
+
+func toggle_drawer() -> void:
+	drawer_open = not drawer_open
+	var target_x = 0.0 if drawer_open else -340.0
+	var target_pos = Vector2(target_x, drawer_panel.position.y)
+	var tween = create_tween()
+	tween.tween_property(drawer_panel, "position", target_pos, 0.35).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	if sound_synthesizer:
+		sound_synthesizer.play_sound("scissor")
+
+func select_tool(t_name: String) -> void:
+	active_tool = t_name
+	for tn in tool_cards.keys():
+		var btn: Button = tool_cards[tn]
+		if tn == active_tool:
+			btn.add_theme_stylebox_override("normal", style_active_card)
+			btn.add_theme_color_override("font_color", Color(0.85, 0.67, 0.28, 1.0))
+		else:
+			btn.add_theme_stylebox_override("normal", style_inactive_card)
+			btn.add_theme_color_override("font_color", Color.WHITE)
+			
+	if sound_synthesizer:
+		sound_synthesizer.stop_sound("all")
+		if active_tool == "Chainsaw":
+			sound_synthesizer.play_sound("chainsaw")
+		elif active_tool == "Mini-Saw":
+			sound_synthesizer.play_sound("minisaw")
+		elif active_tool == "Pruning Shears":
+			sound_synthesizer.play_sound("scissor")
+		elif active_tool == "Hands":
+			sound_synthesizer.play_sound("chime")
+			
+	var tool_controller = get_node_or_null("../ToolController")
+	if tool_controller:
+		if tool_controller.has_method("set_active_tool"):
+			tool_controller.set_active_tool(active_tool)
+		elif tool_controller.has_method("select_tool"):
+			tool_controller.select_tool(active_tool)
+
+func _add_slider(panel: Control, label_text: String, prop_name: String, min_val: float, max_val: float, step: float, tree_gen: Node, triggers_regen: bool) -> void:
 	var hbox = HBoxContainer.new()
 	hbox.name = "HBox" + prop_name.to_upper()
 	panel.add_child(hbox)
 	
 	var label = Label.new()
 	label.text = label_text + ":"
-	label.custom_minimum_size = Vector2(140, 0)
+	label.custom_minimum_size = Vector2(120, 0)
+	label.add_theme_color_override("font_color", Color(0.65, 0.65, 0.7, 1.0))
+	label.add_theme_font_size_override("font_size", 12)
 	hbox.add_child(label)
 	
 	var spin = SpinBox.new()
@@ -264,7 +543,7 @@ func _add_slider(panel: Control, label_text: String, prop_name: String, min_val:
 	spin.min_value = min_val
 	spin.max_value = max_val
 	spin.step = step
-	spin.custom_minimum_size = Vector2(120, 0)
+	spin.custom_minimum_size = Vector2(140, 0)
 	spin.focus_mode = Control.FOCUS_CLICK
 	
 	var le = spin.get_line_edit()
@@ -384,10 +663,29 @@ func _unhandled_input(event: InputEvent) -> void:
 			focus_owner.release_focus()
 		return
 
-	if event is InputEventMouseButton and event.is_pressed():
+	if event is InputEventMouseButton:
+		if event.button_index == MOUSE_BUTTON_LEFT:
+			if event.pressed:
+				if sound_synthesizer:
+					if active_tool == "Chainsaw":
+						sound_synthesizer.play_sound("chainsaw_cut")
+						sound_synthesizer.play_sound("grinding")
+					elif active_tool == "Mini-Saw":
+						sound_synthesizer.play_sound("minisaw_cut")
+						sound_synthesizer.play_sound("grinding")
+					elif active_tool == "Pruning Shears":
+						sound_synthesizer.play_sound("scissor")
+			else:
+				if sound_synthesizer:
+					if active_tool == "Chainsaw":
+						sound_synthesizer.play_sound("chainsaw")
+						sound_synthesizer.stop_sound("grinding")
+					elif active_tool == "Mini-Saw":
+						sound_synthesizer.play_sound("minisaw")
+						sound_synthesizer.stop_sound("grinding")
+						
 		var zoom_speed = 2.0
 		var forward_dir = -global_transform.basis.z.normalized()
-		
 		if event.button_index == MOUSE_BUTTON_WHEEL_UP:
 			position += forward_dir * zoom_speed
 		elif event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
@@ -403,14 +701,12 @@ func _process(delta: float) -> void:
 	if focus_owner and focus_owner is LineEdit:
 		is_typing = true
 		
-	var top_right_panel = get_node_or_null("CanvasLayer/TopRightPanel")
-	if top_right_panel:
-		for axis in ["x", "y", "z"]:
-			var spin: SpinBox = top_right_panel.get_node_or_null("HBox" + axis.to_upper() + "/Spin" + axis.to_upper())
-			if spin and not spin.get_line_edit().has_focus():
-				if axis == "x": spin.set_value_no_signal(position.x)
-				elif axis == "y": spin.set_value_no_signal(position.y)
-				elif axis == "z": spin.set_value_no_signal(position.z)
+	if spin_x and not spin_x.get_line_edit().has_focus():
+		spin_x.set_value_no_signal(position.x)
+	if spin_y and not spin_y.get_line_edit().has_focus():
+		spin_y.set_value_no_signal(position.y)
+	if spin_z and not spin_z.get_line_edit().has_focus():
+		spin_z.set_value_no_signal(position.z)
 					
 	if is_typing:
 		return

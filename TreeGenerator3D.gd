@@ -1,6 +1,8 @@
 extends Node3D
 class_name TreeGenerator3D
 
+signal branch_pruned(branch_index: int)
+
 @export var axiom: String = "X"
 @export var rule_X: String = "F-[[X]+X]+F[+FX]-X"
 @export var rule_F: String = "FF"
@@ -26,6 +28,7 @@ class_name TreeGenerator3D
 @export var wind_speed: float = 0.6
 
 @export var seed: int = 1
+@export var dead_branch_ratio: float = 0.2
 
 var rng := RandomNumberGenerator.new()
 var branches: Array = []
@@ -35,6 +38,7 @@ var time_accum := 0.0
 
 var tree_material: StandardMaterial3D
 var debug_material: StandardMaterial3D
+var diseased_materials: Array[StandardMaterial3D] = []
 var wind_noise: FastNoiseLite
 
 func expand() -> String:
@@ -133,6 +137,17 @@ func _ready():
 	debug_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	debug_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	
+	var colors = [
+		Color(0.45, 0.25, 0.08),
+		Color(0.85, 0.45, 0.1),
+		Color(0.65, 0.1, 0.15)
+	]
+	for c in colors:
+		var mat = StandardMaterial3D.new()
+		mat.albedo_color = c
+		mat.roughness = 0.9
+		diseased_materials.append(mat)
+		
 	wind_noise = FastNoiseLite.new()
 	wind_noise.noise_type = FastNoiseLite.TYPE_SIMPLEX
 	wind_noise.frequency = 0.015
@@ -171,6 +186,8 @@ func generate_tree():
 	var current_path := [pos]
 	var current_thicknesses := [branch_thickness]
 	
+	var current_branch_idx: int = -1
+	
 	for c in commands:
 		match c:
 			"F":
@@ -184,7 +201,7 @@ func generate_tree():
 				current_thicknesses.append(current_t)
 				
 				if should_spawn_branch(current_height):
-					create_branch(pos, dir, current_height, true)
+					current_branch_idx = create_branch(pos, dir, current_height, true, current_branch_idx)
 					
 				pos = next_pos
 				
@@ -195,7 +212,13 @@ func generate_tree():
 				dir = dir.rotated(Vector3.FORWARD, deg_to_rad(-angle_deg))
 				dir = dir.rotated(Vector3.UP, deg_to_rad(rng.randf_range(-150, -30)))
 			"[":
-				stack.append({"pos": pos, "dir": dir, "path": current_path.duplicate(), "thick": current_thicknesses.duplicate()})
+				stack.append({
+					"pos": pos,
+					"dir": dir,
+					"path": current_path.duplicate(),
+					"thick": current_thicknesses.duplicate(),
+					"parent_idx": current_branch_idx
+				})
 				current_path = [pos]
 				current_thicknesses = [current_thicknesses.back()]
 			"]":
@@ -208,6 +231,7 @@ func generate_tree():
 				dir = s.dir
 				current_path = s.path
 				current_thicknesses = s.thick
+				current_branch_idx = s.parent_idx
 
 	if current_path.size() > 1:
 		branch_paths.append(current_path)
@@ -250,12 +274,15 @@ func create_static_branch(path: Array, thicknesses: Array):
 	mesh_node.material_override = tree_material
 	mesh_node.mesh = generate_tube_array(path, thicknesses)
 
-func create_branch(origin: Vector3, trunk_dir: Vector3, height_ratio: float, dynamic: bool):
+func create_branch(origin: Vector3, trunk_dir: Vector3, height_ratio: float, dynamic: bool, parent_index: int) -> int:
+	var branch_idx = branches.size()
+	
 	var branch_root = Node3D.new()
 	add_child(branch_root)
-	branch_root.global_position = origin
+	branch_root.name = "BranchRoot_%d" % branch_idx
+	branch_root.position = origin
 
-	var angle = deg_to_rad(30 + rng.randf_range(-20,20))
+	var angle = deg_to_rad(30 + rng.randf_range(-20, 20))
 	var side = -1 if rng.randf() < 0.5 else 1
 	var axis = trunk_dir.cross(Vector3.UP).normalized()
 	if axis.length() < 0.01:
@@ -269,13 +296,15 @@ func create_branch(origin: Vector3, trunk_dir: Vector3, height_ratio: float, dyn
 
 	var anchor = StaticBody3D.new()
 	branch_root.add_child(anchor)
+	anchor.name = "Anchor"
 
 	var tip = RigidBody3D.new()
 	branch_root.add_child(tip)
+	tip.name = "Tip"
 	
-	if not enable_self_collision:
-		tip.collision_mask = 0
-		tip.collision_layer = 0
+	# Active tree branches: Collision Layer 2, Collision Mask 0 (ignores other physics, only hit by tools/raycasts)
+	tip.collision_layer = 2
+	tip.collision_mask = 0
 	
 	tip.mass = length * 0.5
 	tip.gravity_scale = 0.0
@@ -283,22 +312,33 @@ func create_branch(origin: Vector3, trunk_dir: Vector3, height_ratio: float, dyn
 
 	var joint = Generic6DOFJoint3D.new()
 	branch_root.add_child(joint)
-	joint.node_a = anchor.get_path()
-	joint.node_b = tip.get_path()
+	joint.name = "Joint"
+	
+	if parent_index >= 0 and parent_index < branches.size():
+		joint.node_a = NodePath("../../BranchRoot_%d/Tip" % parent_index)
+	else:
+		joint.node_a = NodePath("../Anchor")
+	joint.node_b = NodePath("../Tip")
 
-	for axis_i in ["x","y","z"]:
+	for axis_i in ["x", "y", "z"]:
 		joint.set("linear_limit_%s_enabled" % axis_i, true)
 		joint.set("linear_limit_%s_lower" % axis_i, 0.0)
 		joint.set("linear_limit_%s_upper" % axis_i, 0.0)
 
-	for axis_i in ["x","y","z"]:
+	for axis_i in ["x", "y", "z"]:
 		joint.set("angular_spring_%s_enabled" % axis_i, true)
 		joint.set("angular_spring_%s_stiffness" % axis_i, stiffness)
 		joint.set("angular_spring_%s_damping" % axis_i, damping)
 
+	var health = "healthy"
+	var mat = tree_material
+	if rng.randf() < dead_branch_ratio:
+		health = "diseased"
+		mat = diseased_materials[rng.randi() % diseased_materials.size()]
+
 	var visual = MeshInstance3D.new()
 	tip.add_child(visual)
-	visual.material_override = tree_material
+	visual.material_override = mat
 	
 	var local_rest_pos = -dir * length
 	var static_path = [local_rest_pos, Vector3.ZERO]
@@ -334,8 +374,16 @@ func create_branch(origin: Vector3, trunk_dir: Vector3, height_ratio: float, dyn
 	
 	branches.append({
 		"anchor": anchor,
-		"tip": tip
+		"tip": tip,
+		"joint": joint,
+		"parent_index": parent_index,
+		"children": [],
+		"severed": false,
+		"health": health
 	})
+	
+	if parent_index >= 0 and parent_index < branches.size() - 1:
+		branches[parent_index].children.append(branch_idx)
 	
 	var debug_vis = MeshInstance3D.new()
 	debug_vis.material_override = debug_material
@@ -372,6 +420,76 @@ func create_branch(origin: Vector3, trunk_dir: Vector3, height_ratio: float, dyn
 	anchor_debug.visible = show_debug
 	anchor.add_child(anchor_debug)
 	debug_meshes.append(anchor_debug)
+	
+	return branch_idx
+
+func prune_branch(branch_index: int):
+	if branch_index < 0 or branch_index >= branches.size():
+		return
+	var b = branches[branch_index]
+	if b.severed:
+		return
+	b.severed = true
+	if is_instance_valid(b.joint):
+		b.joint.queue_free()
+	if is_instance_valid(b.tip):
+		b.tip.gravity_scale = 1.0
+		# Severed debris: Collision Layer 4 (value 8), Collision Mask 1 (collides only with ground plane/chipper)
+		b.tip.collision_layer = 8
+		b.tip.collision_mask = 1
+		
+		# Apply a small outward push/impulse
+		var trunk_dir_out = (b.tip.global_position - global_position).normalized()
+		trunk_dir_out.y = 0.2
+		var push_dir = (trunk_dir_out + Vector3(rng.randf_range(-0.3, 0.3), 0.1, rng.randf_range(-0.3, 0.3))).normalized()
+		b.tip.apply_central_impulse(push_dir * b.tip.mass * 2.0)
+		
+		# Contact monitoring to start the 1.5s fade out when hitting ground
+		b.tip.contact_monitor = true
+		b.tip.max_contacts_reported = 2
+		b.tip.body_entered.connect(func(body):
+			if not is_instance_valid(b.tip) or b.tip.is_queued_for_deletion():
+				return
+			if body.name == "GroundPlane" or body.collision_layer == 1:
+				_start_fade_out(b.tip)
+		)
+		
+	branch_pruned.emit(branch_index)
+	for child_idx in b.children:
+		prune_branch(child_idx)
+
+func _start_fade_out(tip: RigidBody3D):
+	if not is_instance_valid(tip) or tip.is_queued_for_deletion():
+		return
+	if tip.has_meta("fading"):
+		return
+	tip.set_meta("fading", true)
+	
+	var visual: MeshInstance3D = null
+	for child in tip.get_children():
+		if child is MeshInstance3D:
+			visual = child
+			break
+			
+	if visual and visual.material_override:
+		var mat: StandardMaterial3D = visual.material_override.duplicate()
+		visual.material_override = mat
+		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		
+		var tween = tip.create_tween()
+		tween.tween_property(mat, "albedo_color:a", 0.0, 1.5)
+		tween.tween_callback(tip.queue_free)
+	else:
+		var tween = tip.create_tween()
+		tween.tween_interval(1.5)
+		tween.tween_callback(tip.queue_free)
+
+func sever_branch(hit_collider: Node, hit_pos: Vector3, hit_normal: Vector3):
+	for i in range(branches.size()):
+		var b = branches[i]
+		if b.tip == hit_collider:
+			prune_branch(i)
+			break
 
 func set_debug_visible(on: bool) -> void:
 	show_debug = on
@@ -405,6 +523,8 @@ func _physics_process(delta):
 		apply_wind(b, delta)
 
 func apply_wind(b, delta):
+	if b.severed:
+		return
 	var tip: RigidBody3D = b.tip
 	var p = tip.global_position * wind_scale
 	
