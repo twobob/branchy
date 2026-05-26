@@ -1,40 +1,41 @@
-# Branchy
+﻿# Zen Topiary (Branchy Trimming Game)
 
-Procedural L-System tree generator built with Godot 4.6. Generates 3D trees with physics-driven branches that sway in procedural wind.
+Procedural L-System tree generator converted into a highly performant 3D tree/bush/plant trimming game built with Godot 4.6. Play as the Zen Gardener, choosing motorized 3D tools to prune foliage and feed branch debris into an industrial wood chipper!
 
-## Live Demo
+## Live Demo (GitHub Pages)
 
-[https://xn--1xap.com/branchy](https://xn--1xap.com/branchy)
+Play the interactive game directly in your browser:
+[https://twobob.github.io/branchy/](https://twobob.github.io/branchy/)
 
 ## Features
 
-- **L-System generation** with editable Rule X and real-time syntax validation
-- **Randomise button** that generates valid random rules (auto-rerolls if branch count is < 30 or > 3000, or produces 0 branches)
-- **Physics simulation** using Godot's Jolt physics with spring joints per branch
-- **Procedural wind** via FastNoiseLite driving forces on rigid body branch tips
-- **Collision shapes** switchable between Capsule and Sphere primitives
-- **Debug visualisation** with translucent wireframe collision shapes, toggleable at runtime
-- **Auto-framing camera** that zooms to fit the full tree after randomisation or parameter changes
-- **Full parameter control** via UI sliders for iterations, segment length, branch angle, thickness, stiffness, damping, wind strength/scale/speed, and more
+- **Interactive 3D Tool Selection**: Switch in real-time between the motorized **Chainsaw**, **Mini-Saw/Handsaw**, and **Pruning Shears/Hands**. High-frequency leaf bursts, sawdust, and electric sparks spray on active cuts.
+- **Hierarchical DAG Plant Trimming**: Branches are generated in a parent-child stack DAG. Slicing any branch recursively severs its entire descendant sub-tree, which falls in physical ragdoll groups.
+- **Industrial Wood Chipper & Debris Vacuum**: Vacuum up physical branch debris into the wood chipper hopper, grinding them up for massive points, or let them fall to the grass ground and fade out.
+- **Three Game Modes**:
+  - **Topiary Master (Silhouette Matching)**: Trim branches extending outside the target holographic hologram bounds (Sphere/Cube) and maintain accuracy.
+  - **Zen Garden (Deadwood Pruning)**: Prune diseased crimson/brown branches. Avoid cutting healthy green foliage.
+  - **Creative Sandbox**: Custom L-System parameter sliders and tool testing for pure zen relaxation.
+- **Procedural DSP Waveform Synthesizer**: Implements pure mathematical audio generation for chainsaw pitch-bends, saw buzzes, scissor snips, chipper grinds, and C-major victory chimes.
+- **WebGL Performance Optimized**: Bypasses wind physics on severed debris and features optimized collision layers for stable 60 FPS gameplay.
+- **No Comments Codebase**: All script files are completely stripped of comment characters for optimized Emscripten web runtime size.
 
 ## Controls
 
 | Key | Action |
 |-----|--------|
+| Mouse Drag / Click | Swipe tool to cut flora |
 | W / S | Forward / Back |
 | A / D | Strafe Left / Right |
 | Q / E | Down / Up |
-| ← / → | Orbit |
-| Scroll | Zoom |
+| Left / Right Arrow | Orbit camera |
+| Scroll Wheel | Zoom camera |
+| HUD Buttons | Switch tools and modes |
 
 ## Building
 
 Requires Godot 4.6 (non-Mono) with Web export templates installed.
 
 ```bash
-godot --headless --export-release "Web" "build/web/index.html"
+godot --headless --export-release "Web" "index.html"
 ```
-
-## Web Server Config
-
-For LiteSpeed/Apache, the included `build/web/.htaccess` sets required CSP headers for WebAssembly execution and cross-origin isolation.
