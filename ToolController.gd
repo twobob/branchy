@@ -35,7 +35,7 @@ func _ready() -> void:
 			"scene_path": "res://assets/animated_chainsaw.glb",
 			"is_mesh": false,
 			"scale": Vector3(1.0, 1.0, 1.0),
-			"rotation_deg": Vector3(0, 180, 0),
+			"rotation_deg": Vector3(0, -90, 0),
 			"offset": Vector3.ZERO,
 			"type": "chainsaw"
 		},
@@ -43,7 +43,7 @@ func _ready() -> void:
 			"scene_path": "res://assets/makita_brushless.glb",
 			"is_mesh": false,
 			"scale": Vector3(0.5, 0.5, 0.5),
-			"rotation_deg": Vector3(0, 180, 0),
+			"rotation_deg": Vector3(-90, 180, 0),
 			"offset": Vector3.ZERO,
 			"type": "chainsaw"
 		},
@@ -51,7 +51,7 @@ func _ready() -> void:
 			"scene_path": "res://assets/makita_outdoor.fbx",
 			"is_mesh": false,
 			"scale": Vector3(1.0, 1.0, 1.0),
-			"rotation_deg": Vector3(0, -90, 90),
+			"rotation_deg": Vector3(-90, -90, 0),
 			"offset": Vector3.ZERO,
 			"type": "chainsaw"
 		},
@@ -59,7 +59,7 @@ func _ready() -> void:
 			"scene_path": "res://assets/mini_sierra.glb",
 			"is_mesh": false,
 			"scale": Vector3(0.8, 0.8, 0.8),
-			"rotation_deg": Vector3(0, 90, 0),
+			"rotation_deg": Vector3(-90, 90, 0),
 			"offset": Vector3.ZERO,
 			"type": "mini_saw"
 		},
