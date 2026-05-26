@@ -74,7 +74,7 @@ func setup_wood_chipper():
 	chipper_mi.mesh = chipper_mesh
 	
 
-	chipper_mi.scale = Vector3(0.0008, 0.0008, 0.0008)
+	chipper_mi.scale = Vector3(0.0015, 0.0015, 0.0015)
 	chipper_mi.rotation_degrees = Vector3(-90, 0, 0)
 	chipper_mi.position = Vector3(4.0, 0.0, 2.0)
 	add_child(chipper_mi)
@@ -278,7 +278,7 @@ func _process(delta: float):
 				return
 				
 			var origin = camera.project_ray_origin(mouse_pos)
-			var end = origin + camera.project_ray_normal(mouse_pos) * 4.0
+			var end = origin + camera.project_ray_normal(mouse_pos) * 15.0
 			
 			var space_state = get_world_3d().direct_space_state
 			var query = PhysicsRayQueryParameters3D.create(origin, end)

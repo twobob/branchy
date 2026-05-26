@@ -334,8 +334,8 @@ func create_branch(origin: Vector3, trunk_dir: Vector3, height_ratio: float, dyn
 		body.mass = seg_len * 0.3
 		body.gravity_scale = 0.0
 		body.position = dir * seg_len * (seg_i + 1)
-		body.linear_damp = 4.0
-		body.angular_damp = 6.0
+		body.linear_damp = 1.5
+		body.angular_damp = 2.0
 
 		var col = CollisionShape3D.new()
 		var cap = CapsuleShape3D.new()
@@ -422,11 +422,11 @@ func prune_branch(branch_index: int):
 
 	for seg in segs:
 		if is_instance_valid(seg):
-			seg.gravity_scale = 1.0
+			seg.gravity_scale = 3.0
 			seg.collision_layer = 8
 			seg.collision_mask = 1
-			seg.linear_damp = 0.5
-			seg.angular_damp = 0.5
+			seg.linear_damp = 0.2
+			seg.angular_damp = 0.3
 
 	if segs.size() > 0 and is_instance_valid(segs[0]) and segs[0].is_inside_tree():
 		var tip_pos = segs[0].global_position
