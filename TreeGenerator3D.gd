@@ -129,7 +129,7 @@ func _generate_random_rule() -> String:
 
 func _ready():
 	tree_material = StandardMaterial3D.new()
-	tree_material.albedo_color = Color(0.2, 0.5, 0.2)
+	tree_material.albedo_color = Color(0.35, 0.22, 0.12)
 	tree_material.roughness = 0.9
 	
 	debug_material = StandardMaterial3D.new()
@@ -281,7 +281,6 @@ func create_static_branch(path: Array, thicknesses: Array):
 
 func create_branch(origin: Vector3, trunk_dir: Vector3, height_ratio: float, dynamic: bool, parent_index: int) -> int:
 	var branch_idx = branches.size()
-	
 	var branch_root = Node3D.new()
 	add_child(branch_root)
 	branch_root.name = "BranchRoot_%d" % branch_idx
@@ -292,48 +291,14 @@ func create_branch(origin: Vector3, trunk_dir: Vector3, height_ratio: float, dyn
 	var axis = trunk_dir.cross(Vector3.UP).normalized()
 	if axis.length() < 0.01:
 		axis = Vector3.RIGHT
-
 	var dir = trunk_dir.rotated(axis, angle * side).normalized()
 
 	var length_scale = lerp(1.0, branch_length_scale, height_ratio)
-	var length = segment_length * 5.0 * length_scale
+	var total_length = segment_length * 5.0 * length_scale
 	var thick = branch_thickness * 0.6 * length_scale
 
-	var anchor = StaticBody3D.new()
-	branch_root.add_child(anchor)
-	anchor.name = "Anchor"
-
-	var tip = RigidBody3D.new()
-	branch_root.add_child(tip)
-	tip.name = "Tip"
-	
-
-	tip.collision_layer = 2
-	tip.collision_mask = 0
-	
-	tip.mass = length * 0.5
-	tip.gravity_scale = 0.0
-	tip.position = dir * length
-
-	var joint = Generic6DOFJoint3D.new()
-	branch_root.add_child(joint)
-	joint.name = "Joint"
-	
-	if parent_index >= 0 and parent_index < branches.size():
-		joint.node_a = NodePath("../../BranchRoot_%d/Tip" % parent_index)
-	else:
-		joint.node_a = NodePath("../Anchor")
-	joint.node_b = NodePath("../Tip")
-
-	for axis_i in ["x", "y", "z"]:
-		joint.set("linear_limit_%s_enabled" % axis_i, true)
-		joint.set("linear_limit_%s_lower" % axis_i, 0.0)
-		joint.set("linear_limit_%s_upper" % axis_i, 0.0)
-
-	for axis_i in ["x", "y", "z"]:
-		joint.set("angular_spring_%s_enabled" % axis_i, true)
-		joint.set("angular_spring_%s_stiffness" % axis_i, stiffness)
-		joint.set("angular_spring_%s_damping" % axis_i, damping)
+	var num_segs = 3
+	var seg_len = total_length / num_segs
 
 	var health = "healthy"
 	var mat = tree_material
@@ -341,132 +306,148 @@ func create_branch(origin: Vector3, trunk_dir: Vector3, height_ratio: float, dyn
 		health = "diseased"
 		mat = diseased_materials[rng.randi() % diseased_materials.size()]
 
-	var visual = MeshInstance3D.new()
-	tip.add_child(visual)
-	visual.material_override = mat
-	
-	var local_rest_pos = -dir * length
-	var static_path = [local_rest_pos, Vector3.ZERO]
-	var generated_mesh = generate_tube(static_path, thick, thickness_taper)
-	visual.mesh = generated_mesh
-	
-	var tip_col = CollisionShape3D.new()
-	
-	if collision_shape_type == 0:
-		var tip_capsule = CapsuleShape3D.new()
-		tip_capsule.radius = thick
-		tip_capsule.height = length + (thick * 2.0)
-		tip_col.shape = tip_capsule
-		tip_col.position = -dir * (length * 0.5)
-		
-		var up = Vector3.UP
-		if abs(dir.dot(up)) > 0.99: up = Vector3.RIGHT
-		var x_axis = dir.cross(up).normalized()
-		var z_axis = x_axis.cross(dir).normalized()
-		tip_col.basis = Basis(x_axis, dir, z_axis)
-	else:
-		var tip_sphere = SphereShape3D.new()
-		tip_sphere.radius = thick * 0.5
-		tip_col.shape = tip_sphere
-
-	tip.add_child(tip_col)
-	
+	var anchor = StaticBody3D.new()
+	branch_root.add_child(anchor)
+	anchor.name = "Anchor"
 	var anchor_col = CollisionShape3D.new()
 	var anchor_sphere = SphereShape3D.new()
-	anchor_sphere.radius = thick
+	anchor_sphere.radius = thick * 0.5
 	anchor_col.shape = anchor_sphere
 	anchor.add_child(anchor_col)
-	
-	tip.set_meta("is_branch_tip", true)
-	if health == "diseased":
-		tip.set_meta("is_deadwood", true)
-	else:
-		tip.set_meta("is_deadwood", false)
+
+	var segments = []
+	var joints = []
+	var prev_node_path_prefix = "../Anchor"
+	if parent_index >= 0 and parent_index < branches.size():
+		prev_node_path_prefix = "../../BranchRoot_%d/Tip" % parent_index
+
+	for seg_i in range(num_segs):
+		var t = float(seg_i + 1) / num_segs
+		var seg_thick = lerp(thick, thickness_taper, t)
+		var seg_name = "Seg%d" % seg_i
+
+		var body = RigidBody3D.new()
+		branch_root.add_child(body)
+		body.name = seg_name
+		body.collision_layer = 2
+		body.collision_mask = 0
+		body.mass = seg_len * 0.3
+		body.gravity_scale = 0.0
+		body.position = dir * seg_len * (seg_i + 1)
+		body.linear_damp = 4.0
+		body.angular_damp = 6.0
+
+		var col = CollisionShape3D.new()
+		var cap = CapsuleShape3D.new()
+		cap.radius = max(seg_thick, 0.02)
+		cap.height = seg_len + (seg_thick * 2.0)
+		col.shape = cap
+		col.position = -dir * (seg_len * 0.5)
+		var up = Vector3.UP
+		if abs(dir.dot(up)) > 0.99: up = Vector3.RIGHT
+		var x_ax = dir.cross(up).normalized()
+		var z_ax = x_ax.cross(dir).normalized()
+		col.basis = Basis(x_ax, dir, z_ax)
+		body.add_child(col)
+
+		var vis = MeshInstance3D.new()
+		vis.material_override = mat
+		var seg_path = [-dir * seg_len, Vector3.ZERO]
+		var prev_thick = lerp(thick, thickness_taper, float(seg_i) / num_segs)
+		var m = generate_tube(seg_path, prev_thick, seg_thick)
+		if m:
+			vis.mesh = m
+		body.add_child(vis)
+
+		body.set_meta("is_branch_tip", true)
+		body.set_meta("is_deadwood", health == "diseased")
+		body.set_meta("branch_idx", branch_idx)
+		body.set_meta("seg_idx", seg_i)
+
+		var jt = Generic6DOFJoint3D.new()
+		branch_root.add_child(jt)
+		jt.name = "Joint%d" % seg_i
+		if seg_i == 0:
+			jt.node_a = NodePath(prev_node_path_prefix)
+		else:
+			jt.node_a = NodePath("../Seg%d" % (seg_i - 1))
+		jt.node_b = NodePath("../%s" % seg_name)
+
+		var seg_stiff = stiffness * (1.0 - t * 0.5)
+		var seg_damp = damping * (1.0 - t * 0.3)
+		for ax in ["x", "y", "z"]:
+			jt.set("linear_limit_%s_enabled" % ax, true)
+			jt.set("linear_limit_%s_lower" % ax, 0.0)
+			jt.set("linear_limit_%s_upper" % ax, 0.0)
+			jt.set("angular_spring_%s_enabled" % ax, true)
+			jt.set("angular_spring_%s_stiffness" % ax, seg_stiff)
+			jt.set("angular_spring_%s_damping" % ax, seg_damp)
+
+		segments.append(body)
+		joints.append(jt)
 
 	branches.append({
 		"anchor": anchor,
-		"tip": tip,
-		"joint": joint,
+		"tip": segments[-1],
+		"joint": joints[0],
+		"segments": segments,
+		"joints": joints,
 		"parent_index": parent_index,
 		"children": [],
 		"severed": false,
 		"health": health
 	})
-	
+
 	if parent_index >= 0 and parent_index < branches.size() - 1:
 		branches[parent_index].children.append(branch_idx)
-	
-	var debug_vis = MeshInstance3D.new()
-	debug_vis.material_override = debug_material
-	debug_vis.visible = show_debug
-	
-	if collision_shape_type == 0:
-		var cap_mesh = CapsuleMesh.new()
-		cap_mesh.radius = thick
-		cap_mesh.height = length + (thick * 2.0)
-		cap_mesh.rings = 4
-		cap_mesh.radial_segments = 8
-		debug_vis.mesh = cap_mesh
-		debug_vis.position = tip_col.position
-		debug_vis.basis = tip_col.basis
-	else:
-		var sph_mesh = SphereMesh.new()
-		sph_mesh.radius = thick
-		sph_mesh.height = thick * 2.0
-		sph_mesh.rings = 8
-		sph_mesh.radial_segments = 12
-		debug_vis.mesh = sph_mesh
-	
-	tip.add_child(debug_vis)
-	debug_meshes.append(debug_vis)
-	
-	var anchor_debug = MeshInstance3D.new()
-	var anc_mesh = SphereMesh.new()
-	anc_mesh.radius = thick
-	anc_mesh.height = thick * 2.0
-	anc_mesh.rings = 4
-	anc_mesh.radial_segments = 8
-	anchor_debug.mesh = anc_mesh
-	anchor_debug.material_override = debug_material
-	anchor_debug.visible = show_debug
-	anchor.add_child(anchor_debug)
-	debug_meshes.append(anchor_debug)
-	
+
 	return branch_idx
 
 func prune_branch(branch_index: int):
 	if branch_index < 0 or branch_index >= branches.size():
 		return
 	var b = branches[branch_index]
-	if b.severed or not is_instance_valid(b.tip):
+	if b.severed:
 		return
 	b.severed = true
-	if is_instance_valid(b.joint):
+
+	var segs = b.get("segments", [])
+	var jts = b.get("joints", [])
+
+	for jt in jts:
+		if is_instance_valid(jt):
+			jt.queue_free()
+	if is_instance_valid(b.joint) and b.joint not in jts:
 		b.joint.queue_free()
-	if is_instance_valid(b.tip):
-		b.tip.gravity_scale = 1.0
 
-		b.tip.collision_layer = 8
-		b.tip.collision_mask = 1
-		
+	for seg in segs:
+		if is_instance_valid(seg):
+			seg.gravity_scale = 1.0
+			seg.collision_layer = 8
+			seg.collision_mask = 1
+			seg.linear_damp = 0.5
+			seg.angular_damp = 0.5
 
-		var tip_pos = b.tip.global_position if b.tip.is_inside_tree() else b.tip.position
+	if segs.size() > 0 and is_instance_valid(segs[0]) and segs[0].is_inside_tree():
+		var tip_pos = segs[0].global_position
 		var self_pos = global_position if is_inside_tree() else Vector3.ZERO
 		var trunk_dir_out = (tip_pos - self_pos).normalized()
 		trunk_dir_out.y = 0.2
 		var push_dir = (trunk_dir_out + Vector3(rng.randf_range(-0.3, 0.3), 0.1, rng.randf_range(-0.3, 0.3))).normalized()
-		b.tip.apply_central_impulse(push_dir * b.tip.mass * 2.0)
-		
+		segs[0].apply_central_impulse(push_dir * segs[0].mass * 2.0)
 
-		b.tip.contact_monitor = true
-		b.tip.max_contacts_reported = 2
-		b.tip.body_entered.connect(func(body):
-			if not is_instance_valid(b.tip) or b.tip.is_queued_for_deletion():
-				return
-			if body.name == "GroundPlane" or body.collision_layer == 1:
-				_start_fade_out(b.tip)
-		)
-		
+	for seg in segs:
+		if is_instance_valid(seg):
+			seg.contact_monitor = true
+			seg.max_contacts_reported = 2
+			var s = seg
+			seg.body_entered.connect(func(body):
+				if not is_instance_valid(s) or s.is_queued_for_deletion():
+					return
+				if body.name == "GroundPlane" or body.collision_layer == 1:
+					_start_fade_out(s)
+			)
+
 	branch_pruned.emit(branch_index)
 	for child_idx in b.children:
 		prune_branch(child_idx)
@@ -498,11 +479,32 @@ func _start_fade_out(tip: RigidBody3D):
 		tween.tween_callback(tip.queue_free)
 
 func sever_branch(hit_collider: Node, hit_pos: Vector3, hit_normal: Vector3):
+	if hit_collider.has_meta("branch_idx"):
+		var idx = hit_collider.get_meta("branch_idx")
+		if idx >= 0 and idx < branches.size():
+			prune_branch(idx)
+			return
+	var best_idx = -1
+	var best_dist = 999.0
 	for i in range(branches.size()):
 		var b = branches[i]
-		if b.tip == hit_collider:
+		if b.severed:
+			continue
+		var segs = b.get("segments", [])
+		for seg in segs:
+			if seg == hit_collider:
+				prune_branch(i)
+				return
+			if is_instance_valid(seg) and seg.is_inside_tree():
+				var d = seg.global_position.distance_to(hit_pos)
+				if d < best_dist and d < 3.0:
+					best_dist = d
+					best_idx = i
+		if is_instance_valid(b.tip) and b.tip == hit_collider:
 			prune_branch(i)
-			break
+			return
+	if best_idx >= 0:
+		prune_branch(best_idx)
 
 func set_debug_visible(on: bool) -> void:
 	show_debug = on
@@ -534,7 +536,24 @@ func _expand_bounds_recursive(node: Node, bounds: AABB) -> AABB:
 func _physics_process(delta):
 	time_accum += delta
 	for b in branches:
-		apply_wind(b, delta)
+		if b.severed:
+			continue
+		var segs = b.get("segments", [])
+		if segs.size() > 0:
+			for seg in segs:
+				apply_wind_seg(seg, delta)
+		else:
+			apply_wind(b, delta)
+
+func apply_wind_seg(seg, delta):
+	if not is_instance_valid(seg) or seg.sleeping:
+		return
+	var p = seg.global_position * wind_scale
+	var time_offset = time_accum * wind_speed * 5.0
+	var nx = wind_noise.get_noise_3d(p.x, p.y, p.z + time_offset)
+	var nz = wind_noise.get_noise_3d(p.x, p.y + 200.0, p.z + time_offset)
+	var wind = Vector3(nx, 0.0, nz) * wind_strength * capsule_wind_multiplier
+	seg.apply_central_force(wind)
 
 func apply_wind(b, delta):
 	if b.severed or not is_instance_valid(b.tip):
