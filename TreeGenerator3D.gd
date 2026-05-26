@@ -152,15 +152,18 @@ func _ready():
 	wind_noise.noise_type = FastNoiseLite.TYPE_SIMPLEX
 	wind_noise.frequency = 0.015
 	
-	regenerate_tree(seed)
+	call_deferred("regenerate_tree", seed)
 
 func regenerate_tree(new_seed: int):
 	seed = new_seed
 	rng.seed = seed
 	wind_noise.seed = seed
 	
-	for child in get_children():
-		child.queue_free()
+	var old_ch = get_children().duplicate()
+	old_ch.reverse()
+	for c in old_ch:
+		remove_child(c)
+		c.free()
 	branches.clear()
 	debug_meshes.clear()
 	time_accum = 0.0
@@ -263,10 +266,12 @@ func estimate_height(cmd: String) -> float:
 	return max(max_y, 0.001)
 
 func should_spawn_branch(h: float) -> bool:
+	if branches.size() >= 80:
+		return false
 	if h < base_branch_offset:
 		return false
 	var falloff = pow(1.0 - clamp(h, 0.0, 0.99), vertical_falloff)
-	return rng.randf() < clamp(falloff * 1.5, 0.3, 0.95)
+	return rng.randf() < clamp(falloff * 0.6, 0.1, 0.5)
 
 func create_static_branch(path: Array, thicknesses: Array):
 	var mesh_node = MeshInstance3D.new()

@@ -25,14 +25,12 @@ func _ready():
 	tree_gen = get_node_or_null("TreeGenerator3D")
 	camera = get_node_or_null("Camera3D")
 	
-	var tc = load("res://ToolController.gd").new()
-	tc.name = "ToolController"
-	add_child(tc)
+	pass
 	
 	setup_ground_plane()
-	setup_wood_chipper()
-	setup_gui()
-	setup_vfx_assets()
+	pass #setup_wood_chipper()
+	pass #gui
+	pass #vfx
 
 
 func setup_ground_plane():
@@ -46,7 +44,6 @@ func setup_ground_plane():
 	var grass_mat = StandardMaterial3D.new()
 	grass_mat.albedo_color = Color(0.15, 0.32, 0.12)
 	grass_mat.roughness = 0.9
-	grass_mat.specular = 0.1
 	
 
 	var ground_mesh = MeshInstance3D.new()

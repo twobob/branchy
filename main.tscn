@@ -21,26 +21,24 @@ ambient_light_source = 2
 ambient_light_color = Color(0.25, 0.22, 0.2, 1)
 ambient_light_energy = 0.4
 tonemap_mode = 2
-glow_enabled = true
 
-[node name="Main" type="Node3D" unique_id=1254776614]
+[node name="Main" type="Node3D"]
 script = ExtResource("4_main1")
 
-[node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=363820896]
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
 transform = Transform3D(-0.866025, -0.433013, 0.25, 0, 0.5, 0.866025, -0.5, 0.75, -0.433013, 0, 0, 0)
-shadow_enabled = true
 
-[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=1004021759]
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
 environment = SubResource("Environment_c2d3e")
 
-[node name="Camera3D" type="Camera3D" parent="." unique_id=1090631737]
-transform = Transform3D(1, 0, 0, 0, 0.965926, 0.258819, 0, -0.258819, 0.965926, 0, 150, 65)
+[node name="Camera3D" type="Camera3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0.965926, 0.258819, 0, -0.258819, 0.965926, 0, 5, 12)
 fov = 55.0
 script = ExtResource("2_cmra1")
 
-[node name="TreeGenerator3D" type="Node3D" parent="." unique_id=1877086732]
+[node name="TreeGenerator3D" type="Node3D" parent="."]
 script = ExtResource("1_a2b3c")
-segment_length = 0.25
+segment_length = 1.5
 angle_deg = 22.0
 branch_thickness = 0.35
 thickness_taper = 0.03
@@ -55,6 +53,5 @@ wind_scale = 0.3
 wind_speed = 0.4
 seed = 30
 
-[node name="GameController" type="Node3D" parent="." unique_id=987654321]
+[node name="GameController" type="Node3D" parent="."]
 script = ExtResource("3_gctrl")
-

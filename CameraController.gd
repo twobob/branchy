@@ -3,6 +3,7 @@ extends Camera3D
 @export var move_speed: float = 10.0
 
 var sound_synthesizer: Node
+var audio_enabled: bool = false
 var active_tool: String = "Hands"
 var tool_cards: Dictionary = {}
 var drawer_open: bool = false
@@ -36,10 +37,11 @@ func _ready() -> void:
 		tc.name = "ToolController"
 		add_child(tc)
 		
-	var synth_script = load("res://SoundSynthesiser.gd")
-	if synth_script:
-		sound_synthesizer = synth_script.new()
-		add_child(sound_synthesizer)
+	if audio_enabled:
+		var synth_script = load("res://SoundSynthesiser.gd")
+		if synth_script:
+			sound_synthesizer = synth_script.new()
+			add_child(sound_synthesizer)
 		
 	var canvas = CanvasLayer.new()
 	canvas.name = "CanvasLayer"
