@@ -7,6 +7,11 @@ var audio_enabled: bool = false
 var is_orbiting: bool = false
 var orbit_sensitivity: float = 0.003
 var active_tool: String = "Hands"
+var velocity: Vector3 = Vector3.ZERO
+var on_ground: bool = false
+var gravity: float = 20.0
+var jump_speed: float = 7.0
+var walk_speed: float = 5.0
 var tool_cards: Dictionary = {}
 var drawer_open: bool = false
 var drawer_panel: PanelContainer
@@ -742,6 +747,19 @@ func _on_pos_changed(val: float, axis: String) -> void:
 		position.z = val
 
 func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventKey and event.pressed and not event.echo:
+		var key_map = {
+			KEY_1: "Husqvarna",
+			KEY_2: "Chainsaw",
+			KEY_3: "Animated Chainsaw",
+			KEY_4: "Makita Brushless",
+			KEY_5: "Makita Outdoor",
+			KEY_6: "Mini Sierra",
+			KEY_H: "Hands"
+		}
+		if key_map.has(event.keycode):
+			select_tool(key_map[event.keycode])
+			return
 	var focus_owner = get_viewport().gui_get_focus_owner()
 	if focus_owner and focus_owner is LineEdit:
 		if event is InputEventMouseButton and event.is_pressed():
@@ -810,47 +828,46 @@ func _process(delta: float) -> void:
 	if is_typing:
 		return
 		
-	var t_move := Vector3.ZERO
-	
-	if Input.is_key_pressed(KEY_E) or Input.is_key_pressed(KEY_UP):
-		t_move.y -= 3.0
-	if Input.is_key_pressed(KEY_Q) or Input.is_key_pressed(KEY_DOWN):
-		t_move.y += 3.0
-		
-	var right_vec = global_transform.basis.x.normalized()
-	if Input.is_key_pressed(KEY_D):
-		t_move += right_vec
-	if Input.is_key_pressed(KEY_A):
-		t_move -= right_vec
-		
-	if Input.is_key_pressed(KEY_RIGHT) or Input.is_key_pressed(KEY_LEFT):
-		var angle = move_speed * delta * 0.1
-		if Input.is_key_pressed(KEY_LEFT):
-			angle = -angle
-			
-		var pos_2d = Vector2(position.x, position.z)
-		
-		var cos_a = cos(angle)
-		var sin_a = sin(angle)
-		var new_x = pos_2d.x * cos_a - pos_2d.y * sin_a
-		var new_z = pos_2d.x * sin_a + pos_2d.y * cos_a
-		
-		position.x = new_x
-		position.z = new_z
-		
-		rotate_y(-angle)
-		
 	var forward_vec = -global_transform.basis.z
 	forward_vec.y = 0
 	if forward_vec.length_squared() > 0.001:
 		forward_vec = forward_vec.normalized()
-	else:
-		forward_vec = -global_transform.basis.y
-		
+	var right_vec = global_transform.basis.x.normalized()
+	right_vec.y = 0
+	if right_vec.length_squared() > 0.001:
+		right_vec = right_vec.normalized()
+
+	var move_dir := Vector3.ZERO
 	if Input.is_key_pressed(KEY_W):
-		t_move += forward_vec
+		move_dir += forward_vec
 	if Input.is_key_pressed(KEY_S):
-		t_move -= forward_vec
+		move_dir -= forward_vec
+	if Input.is_key_pressed(KEY_D):
+		move_dir += right_vec
+	if Input.is_key_pressed(KEY_A):
+		move_dir -= right_vec
+
+	if move_dir.length_squared() > 0:
+		move_dir = move_dir.normalized()
+
+	velocity.x = move_dir.x * walk_speed
+	velocity.z = move_dir.z * walk_speed
+
+	velocity.y -= gravity * delta
+
+	var ground_y = 1.7
+	if position.y + velocity.y * delta <= ground_y:
+		position.y = ground_y
+		velocity.y = 0.0
+		on_ground = true
+	else:
+		on_ground = false
+
+	if on_ground and Input.is_key_pressed(KEY_SPACE):
+		velocity.y = jump_speed
+
+	var t_move = velocity * delta
+	t_move.y = velocity.y * delta
 
 	if t_move.length() > 0:
 		position += t_move.normalized() * move_speed * delta

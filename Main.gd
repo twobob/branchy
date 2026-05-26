@@ -20,6 +20,12 @@ var saw_timer := 0.0
 
 var grinding_branches: Dictionary = {}
 var chipper_center := Vector3(4.0, 1.2, 2.0)
+var mesh_slicer: MeshSlicer
+var active_cut_joint: CutJoint
+var cut_target: RigidBody3D
+var cut_progress: float = 0.0
+var is_cutting: bool = false
+var wood_grain_mat: StandardMaterial3D
 func _ready():
 	print("Main game coordinator loaded.")
 	
@@ -30,6 +36,10 @@ func _ready():
 	setup_wood_chipper()
 	setup_vfx_assets()
 	setup_laser_dot()
+	mesh_slicer = MeshSlicer.new()
+	add_child(mesh_slicer)
+	wood_grain_mat = StandardMaterial3D.new()
+	wood_grain_mat.albedo_color = Color(0.76, 0.58, 0.36)
 
 func setup_laser_dot():
 	var dot_mesh_inst = MeshInstance3D.new()
@@ -303,40 +313,49 @@ func _process(delta: float):
 		var focus_owner = get_viewport().gui_get_focus_owner()
 		if focus_owner and focus_owner is LineEdit:
 			return
-			
+
 		if camera:
 			var mouse_pos = get_viewport().get_mouse_position()
 			if mouse_pos.x < 50 and mouse_pos.y < 80:
 				return
-				
+
 			var origin = camera.project_ray_origin(mouse_pos)
-			var end = origin + camera.project_ray_normal(mouse_pos) * 2.0
-			
+			var ray_end = origin + camera.project_ray_normal(mouse_pos) * 2.5
+
 			var space_state = get_world_3d().direct_space_state
-			var query = PhysicsRayQueryParameters3D.create(origin, end)
+			var query = PhysicsRayQueryParameters3D.create(origin, ray_end)
 			query.collision_mask = 2
-			
+
 			var result = space_state.intersect_ray(query)
 			if result:
 				var hit_collider = result.collider
 				if hit_collider is RigidBody3D and tree_gen:
 					var hit_pos = result.position
 					var hit_normal = result.normal
-					
-					spawn_particles("spark", hit_pos, hit_normal)
-					spawn_particles("sawdust", hit_pos, hit_normal)
-					
-					if hit_pos.y > 1.5:
-						spawn_particles("leaf", hit_pos, hit_normal)
-						
-					if saw_instance:
-						saw_instance.global_position = hit_pos
-						saw_instance.look_at(hit_pos + hit_normal, Vector3.UP)
-						saw_instance.rotate_object_local(Vector3.UP, PI/2.0)
-						saw_instance.visible = true
-						saw_timer = 0.15
-						
-					tree_gen.sever_branch(hit_collider, hit_pos, hit_normal)
+
+					if Engine.get_physics_frames() % 3 == 0:
+						spawn_particles("sawdust", hit_pos, hit_normal)
+					if Engine.get_physics_frames() % 6 == 0:
+						spawn_particles("spark", hit_pos, hit_normal)
+
+					if cut_target != hit_collider:
+						cut_target = hit_collider
+						cut_progress = 0.0
+						is_cutting = true
+						if active_cut_joint and is_instance_valid(active_cut_joint):
+							active_cut_joint.cut(false)
+
+					cut_progress += delta
+					if cut_progress >= 3.0 and is_cutting:
+						is_cutting = false
+						tree_gen.sever_branch(hit_collider, hit_pos, hit_normal)
+						spawn_particles("leaf", hit_pos, Vector3.UP)
+						cut_target = null
+						cut_progress = 0.0
+	elif is_cutting:
+		is_cutting = false
+		cut_target = null
+		cut_progress = 0.0
 
 func setup_reference_cube():
 	var cube_mi = MeshInstance3D.new()
