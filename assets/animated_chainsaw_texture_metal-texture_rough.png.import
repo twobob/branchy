@@ -3,9 +3,10 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://bpmg23w56feyn"
-path="res://.godot/imported/animated_chainsaw_texture_metal-texture_rough.png-61090e940595ba730c080ddd07796c2c.ctex"
+path.s3tc="res://.godot/imported/animated_chainsaw_texture_metal-texture_rough.png-61090e940595ba730c080ddd07796c2c.s3tc.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc"],
+"vram_texture": true
 }
 generator_parameters={
 "md5": "4f9ee49aa617f4745c8c714faca28367"
@@ -14,11 +15,11 @@ generator_parameters={
 [deps]
 
 source_file="res://assets/animated_chainsaw_texture_metal-texture_rough.png"
-dest_files=["res://.godot/imported/animated_chainsaw_texture_metal-texture_rough.png-61090e940595ba730c080ddd07796c2c.ctex"]
+dest_files=["res://.godot/imported/animated_chainsaw_texture_metal-texture_rough.png-61090e940595ba730c080ddd07796c2c.s3tc.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0
@@ -40,4 +41,4 @@ process/normal_map_invert_y=false
 process/hdr_as_srgb=false
 process/hdr_clamp_exposure=false
 process/size_limit=0
-detect_3d/compress_to=1
+detect_3d/compress_to=0

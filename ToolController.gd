@@ -34,7 +34,7 @@ func _ready() -> void:
 		"animated_chainsaw": {
 			"scene_path": "res://assets/animated_chainsaw.glb",
 			"is_mesh": false,
-			"scale": Vector3(0.01, 0.01, 0.01),
+			"scale": Vector3(1.0, 1.0, 1.0),
 			"rotation_deg": Vector3(0, 180, 0),
 			"offset": Vector3.ZERO,
 			"type": "chainsaw"
@@ -50,7 +50,7 @@ func _ready() -> void:
 		"makita_outdoor": {
 			"scene_path": "res://assets/makita_outdoor.fbx",
 			"is_mesh": false,
-			"scale": Vector3(0.01, 0.01, 0.01),
+			"scale": Vector3(1.0, 1.0, 1.0),
 			"rotation_deg": Vector3(0, -90, 90),
 			"offset": Vector3.ZERO,
 			"type": "chainsaw"

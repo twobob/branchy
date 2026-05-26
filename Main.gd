@@ -80,23 +80,22 @@ func setup_ground_plane():
 
 func setup_wood_chipper():
 
-	var chipper_mesh = load("res://assets/wood_chipper.obj")
-	if not chipper_mesh:
-		printerr("Failed to load assets/wood_chipper.obj")
+	var chipper_scene = load("res://assets/industrial_chipper.glb")
+	if not chipper_scene:
+		printerr("Failed to load industrial chipper")
 		return
 		
-	var chipper_mi = MeshInstance3D.new()
-	chipper_mi.name = "WoodChipperMesh"
-	chipper_mi.mesh = chipper_mesh
+	var chipper_mi = chipper_scene.instantiate()
+	chipper_mi.name = "WoodChipperMesh" 
 	
 
-	chipper_mi.scale = Vector3(0.002, 0.002, 0.002)
-	chipper_mi.rotation_degrees = Vector3(0, 90, 0)
-	chipper_mi.position = Vector3(5.0, 1.48, 3.0)
+	chipper_mi.scale = Vector3(4.0, 4.0, 4.0)
+	chipper_mi.rotation_degrees = Vector3(0, 0, 0)
+	chipper_mi.position = Vector3(5.0, 0.0, 3.0)
 	add_child(chipper_mi)
 	
 
-	chipper_mi.create_trimesh_collision()
+	pass
 	
 
 	for child in chipper_mi.get_children():
