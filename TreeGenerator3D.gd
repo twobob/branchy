@@ -263,7 +263,10 @@ func estimate_height(cmd: String) -> float:
 	return max(max_y, 0.001)
 
 func should_spawn_branch(h: float) -> bool:
-	return true
+	if h < base_branch_offset:
+		return false
+	var falloff = pow(1.0 - clamp(h, 0.0, 0.99), vertical_falloff)
+	return rng.randf() < clamp(falloff * 1.5, 0.3, 0.95)
 
 func create_static_branch(path: Array, thicknesses: Array):
 	var mesh_node = MeshInstance3D.new()
