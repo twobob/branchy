@@ -1,0 +1,24 @@
+[remap]
+
+importer="wav"
+type="AudioStreamWAV"
+uid="uid://qpq07uk2y4f8"
+path="res://.godot/imported/CHAINSAW 1 Cut Wood Log Cedar Tree CU CHSW01_02.wav-6bc39861473966f94fcac044b53f7f38.sample"
+
+[deps]
+
+source_file="res://sounds/CHAINSAW 1 Cut Wood Log Cedar Tree CU CHSW01_02.wav"
+dest_files=["res://.godot/imported/CHAINSAW 1 Cut Wood Log Cedar Tree CU CHSW01_02.wav-6bc39861473966f94fcac044b53f7f38.sample"]
+
+[params]
+
+force/8_bit=false
+force/mono=false
+force/max_rate=false
+force/max_rate_hz=44100
+edit/trim=false
+edit/normalize=false
+edit/loop_mode=0
+edit/loop_begin=0
+edit/loop_end=-1
+compress/mode=2

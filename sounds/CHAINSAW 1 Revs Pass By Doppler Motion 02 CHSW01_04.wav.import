@@ -1,0 +1,24 @@
+[remap]
+
+importer="wav"
+type="AudioStreamWAV"
+uid="uid://cjm35mpekgmch"
+path="res://.godot/imported/CHAINSAW 1 Revs Pass By Doppler Motion 02 CHSW01_04.wav-45f74bd691cd939dff29e7b75a5f8a32.sample"
+
+[deps]
+
+source_file="res://sounds/CHAINSAW 1 Revs Pass By Doppler Motion 02 CHSW01_04.wav"
+dest_files=["res://.godot/imported/CHAINSAW 1 Revs Pass By Doppler Motion 02 CHSW01_04.wav-45f74bd691cd939dff29e7b75a5f8a32.sample"]
+
+[params]
+
+force/8_bit=false
+force/mono=false
+force/max_rate=false
+force/max_rate_hz=44100
+edit/trim=false
+edit/normalize=false
+edit/loop_mode=0
+edit/loop_begin=0
+edit/loop_end=-1
+compress/mode=2
