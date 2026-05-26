@@ -74,9 +74,9 @@ func setup_wood_chipper():
 	chipper_mi.mesh = chipper_mesh
 	
 
-	chipper_mi.scale = Vector3(0.0015, 0.0015, 0.0015)
-	chipper_mi.rotation_degrees = Vector3(-90, 0, 0)
-	chipper_mi.position = Vector3(4.0, 0.0, 2.0)
+	chipper_mi.scale = Vector3(0.003, 0.003, 0.003)
+	chipper_mi.rotation_degrees = Vector3(90, 0, 180)
+	chipper_mi.position = Vector3(-2.0, 2.5, 3.0)
 	add_child(chipper_mi)
 	
 
@@ -131,7 +131,8 @@ func setup_gui():
 	score_label.position = Vector2(-220, 180)
 	canvas.add_child(score_label)
 
-func setup_vfx_assets():
+func setup_vfx_assets()
+	setup_reference_cube():
 
 	leaf_mesh = BoxMesh.new()
 	leaf_mesh.size = Vector3(0.08, 0.08, 0.08)
@@ -278,7 +279,7 @@ func _process(delta: float):
 				return
 				
 			var origin = camera.project_ray_origin(mouse_pos)
-			var end = origin + camera.project_ray_normal(mouse_pos) * 15.0
+			var end = origin + camera.project_ray_normal(mouse_pos) * 2.0
 			
 			var space_state = get_world_3d().direct_space_state
 			var query = PhysicsRayQueryParameters3D.create(origin, end)
@@ -305,3 +306,16 @@ func _process(delta: float):
 						saw_timer = 0.15
 						
 					tree_gen.sever_branch(hit_collider, hit_pos, hit_normal)
+
+func setup_reference_cube():
+	var cube_mi = MeshInstance3D.new()
+	cube_mi.name = "ReferenceCube"
+	var box = BoxMesh.new()
+	box.size = Vector3(1.0, 1.0, 1.0)
+	cube_mi.mesh = box
+	var mat = StandardMaterial3D.new()
+	mat.albedo_color = Color(1.0, 0.2, 0.2, 0.5)
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	cube_mi.material_override = mat
+	cube_mi.position = Vector3(2.0, 0.5, 0.0)
+	add_child(cube_mi)

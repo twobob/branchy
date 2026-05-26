@@ -9,7 +9,7 @@ var mini_sierra_scene = null
 var chainsaw_material_duplicated: bool = false
 var chainsaw_material_override: StandardMaterial3D = null
 
-var rest_pos: Vector3 = Vector3(0.3, -0.28, -0.5)
+var rest_pos: Vector3 = Vector3(0.35, -0.25, -0.6)
 
 func _ready() -> void:
 	chainsaw_scene = load("res://assets/chainsaw.glb")
@@ -79,8 +79,8 @@ func _process(delta: float) -> void:
 	var ndc_x = (mouse_pos.x / vp_size.x - 0.5) * 2.0
 	var ndc_y = -(mouse_pos.y / vp_size.y - 0.5) * 2.0
 
-	var pivot = Vector3(0.35, -0.40, 0.0)
-	var aim_point = Vector3(ndc_x * 0.4, ndc_y * 0.3, -0.9)
+	var pivot = Vector3(0.4, -0.3, -0.25)
+	var aim_point = Vector3(ndc_x * 0.35, ndc_y * 0.25, -1.2)
 	var arm_dir = (aim_point - pivot).normalized()
 
 	var pitch = asin(clamp(-arm_dir.y, -0.8, 0.8))

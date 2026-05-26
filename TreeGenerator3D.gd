@@ -13,7 +13,7 @@ signal branch_pruned(branch_index: int)
 @export var branch_thickness: float = 0.35
 @export var thickness_taper: float = 0.03
 
-@export var base_branch_offset: float = 0.35
+@export var base_branch_offset: float = 0.15
 @export var vertical_falloff: float = 1.2
 @export var branch_length_scale: float = 0.85
 
@@ -271,7 +271,7 @@ func should_spawn_branch(h: float) -> bool:
 	if h < base_branch_offset:
 		return false
 	var falloff = pow(1.0 - clamp(h, 0.0, 0.99), vertical_falloff)
-	return rng.randf() < clamp(falloff * 0.6, 0.1, 0.5)
+	return rng.randf() < clamp(falloff * 0.85, 0.25, 0.7)
 
 func create_static_branch(path: Array, thicknesses: Array):
 	var mesh_node = MeshInstance3D.new()
