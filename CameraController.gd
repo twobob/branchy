@@ -451,18 +451,21 @@ func _ready() -> void:
 	tool_hbox.add_theme_constant_override("separation", 15)
 	tool_margin.add_child(tool_hbox)
 	
-	var tools_list = ["Chainsaw", "Mini-Saw", "Pruning Shears", "Hands"]
+	var tools_list = ["Husqvarna", "Chainsaw", "Animated Chainsaw", "Makita Brushless", "Makita Outdoor", "Mini Sierra", "Hands"]
 	var tool_emojis = {
-		"Chainsaw": "[Chainsaw] ",
-		"Mini-Saw": "[Mini-Saw] ",
-		"Pruning Shears": "[Shears] ",
-		"Hands": "[Hands] "
+		"Husqvarna": "[1] ",
+		"Chainsaw": "[2] ",
+		"Animated Chainsaw": "[3] ",
+		"Makita Brushless": "[4] ",
+		"Makita Outdoor": "[5] ",
+		"Mini Sierra": "[6] ",
+		"Hands": "[H] "
 	}
 	
 	for t_name in tools_list:
 		var btn = Button.new()
 		btn.text = tool_emojis[t_name] + t_name
-		btn.custom_minimum_size = Vector2(110, 70)
+		btn.custom_minimum_size = Vector2(80, 55)
 		btn.add_theme_stylebox_override("normal", style_inactive_card)
 		btn.add_theme_stylebox_override("hover", style_btn_hover)
 		btn.add_theme_stylebox_override("pressed", style_btn_pressed)
@@ -577,12 +580,10 @@ func select_tool(t_name: String) -> void:
 			
 	if sound_synthesizer:
 		sound_synthesizer.stop_sound("all")
-		if active_tool == "Chainsaw":
+		if active_tool in ["Husqvarna", "Chainsaw", "Animated Chainsaw", "Makita Brushless", "Makita Outdoor"]:
 			sound_synthesizer.play_sound("chainsaw")
-		elif active_tool == "Mini-Saw":
+		elif active_tool == "Mini Sierra":
 			sound_synthesizer.play_sound("minisaw")
-		elif active_tool == "Pruning Shears":
-			sound_synthesizer.play_sound("scissor")
 		elif active_tool == "Hands":
 			sound_synthesizer.play_sound("chime")
 			
@@ -591,7 +592,9 @@ func select_tool(t_name: String) -> void:
 		if tool_controller.has_method("set_active_tool"):
 			tool_controller.set_active_tool(active_tool)
 		elif tool_controller.has_method("select_tool"):
-			tool_controller.select_tool(active_tool)
+			var tc_name = active_tool.to_lower().replace(" ", "_")
+			if tc_name == "mini_sierra": tc_name = "mini_sierra"
+			tool_controller.select_tool(tc_name)
 			
 	var game_controller = get_node_or_null("../GameController")
 	if game_controller:
@@ -749,10 +752,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		if event.button_index == MOUSE_BUTTON_LEFT:
 			if event.pressed:
 				if sound_synthesizer:
-					if active_tool == "Chainsaw":
+					if active_tool in ["Husqvarna", "Chainsaw", "Animated Chainsaw", "Makita Brushless", "Makita Outdoor"]:
 						sound_synthesizer.play_sound("chainsaw_cut")
 						sound_synthesizer.play_sound("grinding")
-					elif active_tool == "Mini-Saw":
+					elif active_tool == "Mini Sierra":
 						sound_synthesizer.play_sound("minisaw_cut")
 						sound_synthesizer.play_sound("grinding")
 					elif active_tool == "Pruning Shears":

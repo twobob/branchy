@@ -74,9 +74,9 @@ func setup_wood_chipper():
 	chipper_mi.mesh = chipper_mesh
 	
 
-	chipper_mi.scale = Vector3(0.003, 0.003, 0.003)
-	chipper_mi.rotation_degrees = Vector3(90, 0, 180)
-	chipper_mi.position = Vector3(-2.0, 2.5, 3.0)
+	chipper_mi.scale = Vector3(0.002, 0.002, 0.002)
+	chipper_mi.rotation_degrees = Vector3(0, 90, 0)
+	chipper_mi.position = Vector3(5.0, 1.48, 3.0)
 	add_child(chipper_mi)
 	
 
@@ -131,8 +131,8 @@ func setup_gui():
 	score_label.position = Vector2(-220, 180)
 	canvas.add_child(score_label)
 
-func setup_vfx_assets()
-	setup_reference_cube():
+func setup_vfx_assets():
+	setup_reference_cube()
 
 	leaf_mesh = BoxMesh.new()
 	leaf_mesh.size = Vector3(0.08, 0.08, 0.08)
