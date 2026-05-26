@@ -4,11 +4,11 @@ class_name TreeGenerator3D
 signal branch_pruned(branch_index: int)
 
 @export var axiom: String = "X"
-@export var rule_X: String = "F[+X][-X]FX"
+@export var rule_X: String = "F[+X]F[-X]+X"
 @export var rule_F: String = "FF"
 @export var iterations: int = 5
 
-@export var segment_length: float = 0.25
+@export var segment_length: float = 1.5
 @export var angle_deg: float = 22.0
 @export var branch_thickness: float = 0.35
 @export var thickness_taper: float = 0.03
@@ -540,6 +540,8 @@ func apply_wind(b, delta):
 	if b.severed or not is_instance_valid(b.tip):
 		return
 	var tip: RigidBody3D = b.tip
+	if tip.sleeping:
+		return
 	var p = tip.global_position * wind_scale
 	
 	var time_offset = time_accum * wind_speed * 5.0

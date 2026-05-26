@@ -28,7 +28,7 @@ func _ready():
 	pass
 	
 	setup_ground_plane()
-	pass #setup_wood_chipper()
+	setup_wood_chipper()
 	pass #gui
 	pass #vfx
 
