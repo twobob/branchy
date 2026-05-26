@@ -278,7 +278,7 @@ func _process(delta: float):
 				return
 				
 			var origin = camera.project_ray_origin(mouse_pos)
-			var end = origin + camera.project_ray_normal(mouse_pos) * 1000.0
+			var end = origin + camera.project_ray_normal(mouse_pos) * 100.0
 			
 			var space_state = get_world_3d().direct_space_state
 			var query = PhysicsRayQueryParameters3D.create(origin, end)

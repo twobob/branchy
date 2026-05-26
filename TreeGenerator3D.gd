@@ -240,8 +240,8 @@ func generate_tree():
 		branch_paths.append(current_path)
 		path_thicknesses.append(current_thicknesses)
 		
-	# for i in range(branch_paths.size()):
-	# 	create_static_branch(branch_paths[i], path_thicknesses[i])
+	for i in range(branch_paths.size()):
+		create_static_branch(branch_paths[i], path_thicknesses[i])
 
 func estimate_height(cmd: String) -> float:
 	var max_y := 0.0
@@ -555,6 +555,8 @@ func apply_wind(b, delta):
 	tip.apply_central_force(wind)
 
 func generate_tube_array(path: Array, thicknesses: Array) -> ArrayMesh:
+	if path.size() < 2 or thicknesses.size() < 2:
+		return null
 	var st = SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	
@@ -600,6 +602,8 @@ func generate_tube_array(path: Array, thicknesses: Array) -> ArrayMesh:
 	return st.commit()
 
 func generate_tube(path: Array, start_thickness: float, end_thickness: float) -> ArrayMesh:
+	if path.size() < 2:
+		return null
 	var st = SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	

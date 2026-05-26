@@ -126,4 +126,4 @@ func _process(delta: float) -> void:
 		var blade = current_model.get_node_or_null("texture_pbr_v128")
 		if blade:
 			var spin_speed = 65.0 if is_cutting else 15.0
-			blade.rotate_local_x(spin_speed * delta)
+			blade.rotate_object_local(Vector3.RIGHT, spin_speed * delta)
