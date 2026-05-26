@@ -1,4 +1,4 @@
-﻿extends Node3D
+extends Node3D
 
 var active_tool_name: String = "none"
 var tool_holder: Node3D = null
@@ -35,7 +35,7 @@ func _ready() -> void:
 			"scene_path": "res://assets/animated_chainsaw.glb",
 			"is_mesh": false,
 			"scale": Vector3(1.0, 1.0, 1.0),
-			"rotation_deg": Vector3(0, -90, 0),
+			"rotation_deg": Vector3(0, 90, 0),
 			"offset": Vector3.ZERO,
 			"type": "chainsaw"
 		},
