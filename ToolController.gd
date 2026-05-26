@@ -92,19 +92,21 @@ func _process(delta: float) -> void:
 		vib_y = randf_range(-0.015, 0.015)
 		vib_z = randf_range(-0.015, 0.015)
 		
+	var target_pos = rest_local_pos
 	var target_rot = rest_local_rot
 	if is_cutting:
+		target_pos = Vector3(0.05, -0.15, -0.55)
 		if active_tool_name == "chainsaw":
-			var swing = sin(time * 12.0) * 0.2
-			target_rot = Vector3(rest_local_rot.x - swing * 0.2, rest_local_rot.y + swing, rest_local_rot.z + swing * 0.3)
+			var vibrate = sin(time * 40.0) * 0.02
+			target_rot = Vector3(rest_local_rot.x - 0.15, rest_local_rot.y, rest_local_rot.z + vibrate)
 		elif active_tool_name == "mini_sierra" or active_tool_name == "mini-saw":
-			var swing = sin(time * 15.0) * 0.15
-			target_rot = Vector3(rest_local_rot.x + swing * 0.4, rest_local_rot.y + swing, rest_local_rot.z)
+			var vibrate = sin(time * 50.0) * 0.015
+			target_rot = Vector3(rest_local_rot.x + 0.1, rest_local_rot.y + vibrate, rest_local_rot.z)
 		elif active_tool_name == "shears" or active_tool_name == "pruning shears":
-			var swing = sin(time * 25.0) * 0.18
-			target_rot = Vector3(rest_local_rot.x + swing, rest_local_rot.y, rest_local_rot.z)
+			var chop = sin(time * 25.0) * 0.18
+			target_rot = Vector3(rest_local_rot.x + chop, rest_local_rot.y, rest_local_rot.z)
 			
-	tool_holder.position = tool_holder.position.lerp(rest_local_pos + Vector3(bob_x + vib_x, bob_y + vib_y, vib_z), 8.0 * delta)
+	tool_holder.position = tool_holder.position.lerp(target_pos + Vector3(bob_x + vib_x, bob_y + vib_y, vib_z), 8.0 * delta)
 	tool_holder.rotation.x = lerp_angle(tool_holder.rotation.x, target_rot.x, 12.0 * delta)
 	tool_holder.rotation.y = lerp_angle(tool_holder.rotation.y, target_rot.y, 12.0 * delta)
 	tool_holder.rotation.z = lerp_angle(tool_holder.rotation.z, target_rot.z, 12.0 * delta)
@@ -119,11 +121,11 @@ func _process(delta: float) -> void:
 					mesh_inst.material_override = chainsaw_material_override
 					chainsaw_material_duplicated = true
 			if chainsaw_material_override:
-				var offset_speed = 22.0 if is_cutting else 4.0
+				var offset_speed = 22.0 if is_cutting else 0.0
 				chainsaw_material_override.uv1_offset += Vector3(offset_speed * delta, offset_speed * delta, 0.0)
 				
 	elif (active_tool_name == "mini_sierra" or active_tool_name == "mini-saw") and is_instance_valid(current_model):
 		var blade = current_model.get_node_or_null("texture_pbr_v128")
 		if blade:
-			var spin_speed = 65.0 if is_cutting else 15.0
+			var spin_speed = 65.0 if is_cutting else 0.0
 			blade.rotate_object_local(Vector3.RIGHT, spin_speed * delta)

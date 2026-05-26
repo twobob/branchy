@@ -274,7 +274,7 @@ func _process(delta: float):
 			
 		if camera:
 			var mouse_pos = get_viewport().get_mouse_position()
-			if mouse_pos.x < 330 and mouse_pos.y < 650:
+			if mouse_pos.x < 50 and mouse_pos.y < 80:
 				return
 				
 			var origin = camera.project_ray_origin(mouse_pos)

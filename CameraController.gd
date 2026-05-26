@@ -1,9 +1,11 @@
 extends Camera3D
 
-@export var move_speed: float = 10.0
+@export var move_speed: float = 15.0
 
 var sound_synthesizer: Node
 var audio_enabled: bool = false
+var is_orbiting: bool = false
+var orbit_sensitivity: float = 0.003
 var active_tool: String = "Hands"
 var tool_cards: Dictionary = {}
 var drawer_open: bool = false
@@ -502,6 +504,7 @@ func _ready() -> void:
 		"W/S - Forward / Back",
 		"A/D - Strafe Left / Right",
 		"Q/E - Down / Up",
+		"Right-Click Drag - Orbit",
 		"Left/Right - Orbit",
 		"Scroll - Zoom",
 	]
@@ -763,12 +766,26 @@ func _unhandled_input(event: InputEvent) -> void:
 						sound_synthesizer.play_sound("minisaw")
 						sound_synthesizer.stop_sound("grinding")
 						
+		if event.button_index == MOUSE_BUTTON_RIGHT:
+			is_orbiting = event.pressed
+			if event.pressed:
+				Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+			else:
+				Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+
 		var zoom_speed = 2.0
 		var forward_dir = -global_transform.basis.z.normalized()
 		if event.button_index == MOUSE_BUTTON_WHEEL_UP:
 			position += forward_dir * zoom_speed
 		elif event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
 			position -= forward_dir * zoom_speed
+
+	if event is InputEventMouseMotion and is_orbiting:
+		var rel = event.relative
+		rotate_y(-rel.x * orbit_sensitivity)
+		var current_x_rot = rotation.x
+		var new_x = clamp(current_x_rot - rel.y * orbit_sensitivity, -PI * 0.45, PI * 0.45)
+		rotation.x = new_x
 
 func _process(delta: float) -> void:
 	var label = get_node_or_null("CanvasLayer/FPSLabel")
