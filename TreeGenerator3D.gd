@@ -1,31 +1,31 @@
-﻿extends Node3D
+extends Node3D
 class_name TreeGenerator3D
 
 signal branch_pruned(branch_index: int)
 
 @export var axiom: String = "X"
-@export var rule_X: String = "F-[[X]+X]+F[+FX]-X"
+@export var rule_X: String = "F[+X][-X]FX"
 @export var rule_F: String = "FF"
 @export var iterations: int = 5
 
-@export var segment_length: float = 0.6
-@export var angle_deg: float = 25.0
-@export var branch_thickness: float = 0.25
-@export var thickness_taper: float = 0.05
+@export var segment_length: float = 0.25
+@export var angle_deg: float = 22.0
+@export var branch_thickness: float = 0.35
+@export var thickness_taper: float = 0.03
 
-@export var base_branch_offset: float = 0.2
-@export var vertical_falloff: float = 1.6
-@export var branch_length_scale: float = 0.7
+@export var base_branch_offset: float = 0.35
+@export var vertical_falloff: float = 1.2
+@export var branch_length_scale: float = 0.85
 
 @export_enum("Capsule", "Sphere") var collision_shape_type: int = 0
 @export var enable_self_collision: bool = false
-@export var capsule_wind_multiplier: float = 5.0
-@export var stiffness: float = 18.0
-@export var damping: float = 3.5
+@export var capsule_wind_multiplier: float = 1.5
+@export var stiffness: float = 80.0
+@export var damping: float = 12.0
 
-@export var wind_strength: float = 12.0
-@export var wind_scale: float = 0.5
-@export var wind_speed: float = 0.6
+@export var wind_strength: float = 1.5
+@export var wind_scale: float = 0.3
+@export var wind_speed: float = 0.4
 
 @export var seed: int = 1
 @export var dead_branch_ratio: float = 0.2
@@ -33,7 +33,7 @@ signal branch_pruned(branch_index: int)
 var rng := RandomNumberGenerator.new()
 var branches: Array = []
 var debug_meshes: Array = []
-var show_debug: bool = true
+var show_debug: bool = false
 var time_accum := 0.0
 
 var tree_material: StandardMaterial3D
@@ -237,8 +237,8 @@ func generate_tree():
 		branch_paths.append(current_path)
 		path_thicknesses.append(current_thicknesses)
 		
-	for i in range(branch_paths.size()):
-		create_static_branch(branch_paths[i], path_thicknesses[i])
+	# for i in range(branch_paths.size()):
+	# 	create_static_branch(branch_paths[i], path_thicknesses[i])
 
 func estimate_height(cmd: String) -> float:
 	var max_y := 0.0
@@ -263,10 +263,7 @@ func estimate_height(cmd: String) -> float:
 	return max(max_y, 0.001)
 
 func should_spawn_branch(h: float) -> bool:
-	if h < base_branch_offset:
-		return false
-	var falloff = pow(1.0 - h, vertical_falloff)
-	return rng.randf() < (falloff * 2.0)
+	return true
 
 func create_static_branch(path: Array, thicknesses: Array):
 	var mesh_node = MeshInstance3D.new()
@@ -433,7 +430,7 @@ func prune_branch(branch_index: int):
 	if branch_index < 0 or branch_index >= branches.size():
 		return
 	var b = branches[branch_index]
-	if b.severed:
+	if b.severed or not is_instance_valid(b.tip):
 		return
 	b.severed = true
 	if is_instance_valid(b.joint):
@@ -532,7 +529,7 @@ func _physics_process(delta):
 		apply_wind(b, delta)
 
 func apply_wind(b, delta):
-	if b.severed:
+	if b.severed or not is_instance_valid(b.tip):
 		return
 	var tip: RigidBody3D = b.tip
 	var p = tip.global_position * wind_scale
@@ -542,7 +539,7 @@ func apply_wind(b, delta):
 	var ny = wind_noise.get_noise_3d(p.x + 100.0, p.y + time_offset, p.z)
 	var nz = wind_noise.get_noise_3d(p.x, p.y + 200.0, p.z + time_offset)
 	
-	var wind = Vector3(nx, ny * 0.5, nz) * wind_strength * 2.5
+	var wind = Vector3(nx, ny * 0.3, nz) * wind_strength
 	if collision_shape_type == 0:
 		wind *= capsule_wind_multiplier
 	tip.apply_central_force(wind)

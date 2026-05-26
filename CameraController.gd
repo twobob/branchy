@@ -1,4 +1,4 @@
-﻿extends Camera3D
+extends Camera3D
 
 @export var move_speed: float = 10.0
 
@@ -53,14 +53,14 @@ func _ready() -> void:
 	
 	var fps_label = Label.new()
 	fps_label.name = "FPSLabel"
-	fps_label.position = Vector2(360, 20)
+	fps_label.position = Vector2(15, 60)
 	fps_label.add_theme_color_override("font_color", Color(0.65, 0.65, 0.7, 1.0))
 	fps_label.add_theme_font_size_override("font_size", 14)
 	canvas.add_child(fps_label)
 	
 	var dev_toggle = Button.new()
 	dev_toggle.name = "DevToggleBtn"
-	dev_toggle.text = "? DEVELOPER"
+	dev_toggle.text = "[DEV] Console"
 	dev_toggle.custom_minimum_size = Vector2(130, 40)
 	dev_toggle.position = Vector2(15, 15)
 	dev_toggle.add_theme_stylebox_override("normal", style_btn_normal)
@@ -76,7 +76,7 @@ func _ready() -> void:
 	drawer_panel.custom_minimum_size = Vector2(340, 0)
 	drawer_panel.set_anchors_preset(Control.PRESET_LEFT_WIDE)
 	drawer_panel.grow_horizontal = Control.GROW_DIRECTION_END
-	drawer_panel.position = Vector2(-340, 0)
+	drawer_panel.position = Vector2(-340, 60)
 	
 	var drawer_style = _create_glass_style(Color(0.06, 0.06, 0.08, 0.94), Color(1.0, 1.0, 1.0, 0.15), 0)
 	drawer_style.corner_radius_top_right = 16
@@ -299,7 +299,7 @@ func _ready() -> void:
 	top_panel.custom_minimum_size = Vector2(820, 80)
 	top_panel.set_anchors_preset(Control.PRESET_CENTER_TOP)
 	top_panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	top_panel.position = Vector2(-410, 15)
+	top_panel.position = Vector2(-410, 5)
 	var top_style = _create_glass_style(Color(0.08, 0.08, 0.1, 0.65), Color(1.0, 1.0, 1.0, 0.15), 12)
 	top_panel.add_theme_stylebox_override("panel", top_style)
 	canvas.add_child(top_panel)
@@ -410,8 +410,8 @@ func _ready() -> void:
 	wind_vbox.add_child(wind_h)
 	var wind_slide = HSlider.new()
 	wind_slide.min_value = 0.0
-	wind_slide.max_value = 100.0
-	wind_slide.value = tree_gen.wind_strength if tree_gen else 15.0
+	wind_slide.max_value = 10.0
+	wind_slide.value = tree_gen.wind_strength if tree_gen else 1.5
 	wind_slide.custom_minimum_size = Vector2(100, 16)
 	wind_slide.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	wind_h.add_child(wind_slide)
@@ -432,7 +432,7 @@ func _ready() -> void:
 	tool_bar.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
 	tool_bar.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	tool_bar.grow_vertical = Control.GROW_DIRECTION_BEGIN
-	tool_bar.position = Vector2(-260, -120)
+	tool_bar.position = Vector2(-260, -130)
 	var tool_bar_style = _create_glass_style(Color(0.06, 0.06, 0.08, 0.75), Color(1.0, 1.0, 1.0, 0.18), 16)
 	tool_bar.add_theme_stylebox_override("panel", tool_bar_style)
 	canvas.add_child(tool_bar)
@@ -474,8 +474,8 @@ func _ready() -> void:
 	var legend_panel = PanelContainer.new()
 	legend_panel.name = "LegendPanel"
 	legend_panel.custom_minimum_size = Vector2(200, 180)
-	legend_panel.set_anchors_preset(Control.PRESET_CENTER_RIGHT)
-	legend_panel.position = Vector2(-220, -90)
+	legend_panel.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
+	legend_panel.position = Vector2(-220, -210)
 	var legend_style = _create_glass_style(Color(0.08, 0.08, 0.1, 0.6), Color(1.0, 1.0, 1.0, 0.12), 12)
 	legend_panel.add_theme_stylebox_override("panel", legend_style)
 	canvas.add_child(legend_panel)

@@ -1,4 +1,4 @@
-﻿extends Node3D
+extends Node3D
 
 
 
@@ -18,7 +18,7 @@ var saw_timer := 0.0
 
 
 var grinding_branches: Dictionary = {}
-var chipper_center := Vector3(-1.55, 0.84, 3.37)
+var chipper_center := Vector3(4.0, 1.2, 2.0)
 func _ready():
 	print("Main game coordinator loaded.")
 	
@@ -33,10 +33,7 @@ func _ready():
 	setup_wood_chipper()
 	setup_gui()
 	setup_vfx_assets()
-	setup_vfx_assets()
-	var tc = load("res://ToolController.gd").new()
-	tc.name = "ToolController"
-	add_child(tc)
+
 
 func setup_ground_plane():
 	var ground = StaticBody3D.new()
@@ -80,9 +77,9 @@ func setup_wood_chipper():
 	chipper_mi.mesh = chipper_mesh
 	
 
-	chipper_mi.scale = Vector3(0.001, 0.001, 0.001)
-	chipper_mi.rotation_degrees = Vector3(0, -90, 0)
-	chipper_mi.position = Vector3(-1.952, -0.234, -0.082)
+	chipper_mi.scale = Vector3(0.0008, 0.0008, 0.0008)
+	chipper_mi.rotation_degrees = Vector3(-90, 0, 0)
+	chipper_mi.position = Vector3(4.0, 0.0, 2.0)
 	add_child(chipper_mi)
 	
 

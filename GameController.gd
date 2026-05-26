@@ -1,4 +1,4 @@
-﻿extends Node3D
+extends Node3D
 class_name GameController
 
 enum Mode { SILHOUETTE, DEADWOOD, SANDBOX }
@@ -100,6 +100,12 @@ func _process(delta: float) -> void:
 	if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
 		_handle_mouse_action()
 
+
+func select_tool(tool_name: String) -> void:
+	active_tool = tool_name
+	if camera_controller and camera_controller.has_method("select_tool"):
+		camera_controller.select_tool(tool_name)
+
 func _setup_wood_chipper() -> void:
 
 	var chipper_mesh = load("res://assets/wood_chipper.obj")
@@ -125,21 +131,21 @@ func _setup_wood_chipper() -> void:
 	wood_chipper_root.add_child(chipper_vis)
 	
 
-	var center_offset = Vector3(1952.435, 233.793, 82.197)
+	var center_offset = Vector3(1952.436, -739.587, 82.197)
 	chipper_vis.position = -center_offset
 	
 
-	wood_chipper_root.scale = Vector3(0.001, 0.001, 0.001)
+	wood_chipper_root.scale = Vector3(0.0008, 0.0008, 0.0008)
 	
 
-	wood_chipper_root.position = Vector3(4.5, 0.0, 0.0)
-	wood_chipper_root.rotation_degrees = Vector3(0, 180, 0)
+	wood_chipper_root.position = Vector3(4.0, 0.0, 2.0)
+	wood_chipper_root.rotation_degrees = Vector3(-90, 0, 0)
 	
 
 	hopper_area = Area3D.new()
 	hopper_area.name = "HopperArea"
 	add_child(hopper_area)
-	hopper_area.position = Vector3(4.5, 1.2, 0.0)
+	hopper_area.position = Vector3(4.0, 1.2, 2.0)
 	
 	var col = CollisionShape3D.new()
 	var box = BoxShape3D.new()
@@ -150,7 +156,54 @@ func _setup_wood_chipper() -> void:
 	hopper_area.body_entered.connect(_on_hopper_body_entered)
 
 func _setup_hud() -> void:
-	pass
+	canvas_layer = CanvasLayer.new()
+	add_child(canvas_layer)
+	
+	victory_panel = PanelContainer.new()
+	victory_panel.name = "VictoryPanel"
+	victory_panel.visible = false
+	victory_panel.set_anchors_preset(Control.PRESET_CENTER)
+	victory_panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	victory_panel.grow_vertical = Control.GROW_DIRECTION_BOTH
+	victory_panel.position = Vector2(-200, -100)
+	victory_panel.custom_minimum_size = Vector2(400, 200)
+	
+	var style = StyleBoxFlat.new()
+	style.bg_color = Color(0.08, 0.08, 0.1, 0.88)
+	style.border_color = Color(1.0, 1.0, 1.0, 0.15)
+	style.border_width_left = 2
+	style.border_width_top = 2
+	style.border_width_right = 2
+	style.border_width_bottom = 2
+	style.corner_radius_top_left = 16
+	style.corner_radius_top_right = 16
+	style.corner_radius_bottom_left = 16
+	style.corner_radius_bottom_right = 16
+	victory_panel.add_theme_stylebox_override("panel", style)
+	
+	var margin = MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 20)
+	margin.add_theme_constant_override("margin_top", 20)
+	margin.add_theme_constant_override("margin_right", 20)
+	margin.add_theme_constant_override("margin_bottom", 20)
+	victory_panel.add_child(margin)
+	
+	var vbox = VBoxContainer.new()
+	vbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	margin.add_child(vbox)
+	
+	victory_label = Label.new()
+	victory_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	victory_label.add_theme_color_override("font_color", Color(0.9, 0.9, 0.95, 1.0))
+	victory_label.add_theme_font_size_override("font_size", 18)
+	vbox.add_child(victory_label)
+	
+	canvas_layer.add_child(victory_panel)
+	
+	level_title_label = Label.new()
+	info_label = Label.new()
+	accuracy_label = Label.new()
+	score_label = Label.new()
 
 func select_level(level_idx: int) -> void:
 	current_level = level_idx
@@ -188,7 +241,10 @@ func select_level(level_idx: int) -> void:
 			info_label.text = "Sandbox Play: Customize the parameters and prune to your heart's content!"
 			
 
-	select_tool("Chainsaw")
+	if camera_controller and camera_controller.has_method("select_tool"):
+		camera_controller.select_tool("Chainsaw")
+	else:
+		active_tool = "Chainsaw"
 	
 
 	regenerate_current_tree()
@@ -480,7 +536,7 @@ func _vacuum_branch(tip: RigidBody3D) -> void:
 	
 
 	var tween = create_tween()
-	var target = Vector3(4.5, 1.2, 0.0)
+	var target = Vector3(4.0, 1.2, 2.0)
 	
 	tween.tween_property(tip, "global_position", target, 0.45).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 	tween.parallel().tween_property(tip, "scale", Vector3.ZERO, 0.45)
@@ -526,7 +582,7 @@ func _shred_branch_event(tip: RigidBody3D) -> void:
 	var p_color = Color(0.4, 0.28, 0.18)
 	if not is_deadwood:
 		p_color = Color(0.18, 0.52, 0.18)
-	spawn_particles(Vector3(4.5, 1.2, 0.0), p_color)
+	spawn_particles(Vector3(4.0, 1.2, 2.0), p_color)
 	
 
 	var parent = tip.get_parent()
@@ -560,9 +616,9 @@ func complete_level() -> void:
 	victory_panel.visible = true
 	
 	if current_mode == Mode.SILHOUETTE:
-		victory_label.text = "LEVEL COMPLETED!\nAccuracy: %.1f%%\n\u2b50 Perfect Topiary! \u2b50" % calculate_accuracy()
+		victory_label.text = "LEVEL COMPLETED!\nAccuracy: %.1f%%\n>>> Perfect Topiary! <<<" % calculate_accuracy()
 	else:
-		victory_label.text = "LEVEL COMPLETED!\nScore: %d\nDiseased Pruned: %d/%d\n\u2b50 Forest Master! \u2b50" % [score, pruned_deadwood, total_deadwood]
+		victory_label.text = "LEVEL COMPLETED!\nScore: %d\nDiseased Pruned: %d/%d\n>>> Forest Master! <<<" % [score, pruned_deadwood, total_deadwood]
 		
 	play_procedural_sound("victory")
 	
@@ -591,7 +647,7 @@ func update_hud() -> void:
 				camera_controller.accuracy = 100.0
 		else:
 			camera_controller.mode = "Creative Sandbox"
-			camera_controller.accuracy = 100.0
+			camera_controller.accuracy = 0.0
 		if camera_controller.has_method("refresh_hud"):
 			camera_controller.refresh_hud()
 

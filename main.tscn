@@ -1,8 +1,9 @@
-﻿[gd_scene format=3 uid="uid://b0t7w8j3k1q2c"]
+[gd_scene format=3 uid="uid://b0t7w8j3k1q2c"]
 
 [ext_resource type="Script" uid="uid://biax656drt234" path="res://TreeGenerator3D.gd" id="1_a2b3c"]
 [ext_resource type="Script" uid="uid://csd7bj5vpwdg2" path="res://CameraController.gd" id="2_cmra1"]
 [ext_resource type="Script" path="res://GameController.gd" id="3_gctrl"]
+[ext_resource type="Script" path="res://Main.gd" id="4_main1"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_x1y2z"]
 sky_top_color = Color(0.1, 0.07, 0.18, 1)
@@ -23,6 +24,7 @@ tonemap_mode = 2
 glow_enabled = true
 
 [node name="Main" type="Node3D" unique_id=1254776614]
+script = ExtResource("4_main1")
 
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=363820896]
 transform = Transform3D(-0.866025, -0.433013, 0.25, 0, 0.5, 0.866025, -0.5, 0.75, -0.433013, 0, 0, 0)
@@ -38,19 +40,19 @@ script = ExtResource("2_cmra1")
 
 [node name="TreeGenerator3D" type="Node3D" parent="." unique_id=1877086732]
 script = ExtResource("1_a2b3c")
-segment_length = 1.5
-angle_deg = 15.0
-branch_thickness = 0.3
+segment_length = 0.25
+angle_deg = 22.0
+branch_thickness = 0.35
 thickness_taper = 0.03
 vertical_falloff = 1.2
-branch_length_scale = 1.0
-collision_shape_type = 1
-capsule_wind_multiplier = 8.0
-stiffness = 30.0
-damping = 5.0
-wind_strength = 6.0
-wind_scale = 1.0
-wind_speed = 1.0
+branch_length_scale = 0.85
+collision_shape_type = 0
+capsule_wind_multiplier = 1.5
+stiffness = 80.0
+damping = 12.0
+wind_strength = 1.5
+wind_scale = 0.3
+wind_speed = 0.4
 seed = 30
 
 [node name="GameController" type="Node3D" parent="." unique_id=987654321]
