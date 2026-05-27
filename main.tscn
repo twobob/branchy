@@ -2,8 +2,8 @@
 
 [ext_resource type="Script" uid="uid://biax656drt234" path="res://TreeGenerator3D.gd" id="1_a2b3c"]
 [ext_resource type="Script" uid="uid://csd7bj5vpwdg2" path="res://CameraController.gd" id="2_cmra1"]
-[ext_resource type="Script" path="res://GameController.gd" id="3_gctrl"]
-[ext_resource type="Script" path="res://Main.gd" id="4_main1"]
+[ext_resource type="Script" uid="uid://bo0marvp432cu" path="res://GameController.gd" id="3_gctrl"]
+[ext_resource type="Script" uid="uid://bswsdml4comia" path="res://Main.gd" id="4_main1"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_x1y2z"]
 sky_top_color = Color(0.1, 0.07, 0.18, 1)
@@ -22,36 +22,23 @@ ambient_light_color = Color(0.25, 0.22, 0.2, 1)
 ambient_light_energy = 0.4
 tonemap_mode = 2
 
-[node name="Main" type="Node3D"]
+[node name="Main" type="Node3D" unique_id=1071063370]
 script = ExtResource("4_main1")
 
-[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=1220994263]
 transform = Transform3D(-0.866025, -0.433013, 0.25, 0, 0.5, 0.866025, -0.5, 0.75, -0.433013, 0, 0, 0)
 
-[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=787049979]
 environment = SubResource("Environment_c2d3e")
 
-[node name="Camera3D" type="Camera3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 0.965926, 0.258819, 0, -0.258819, 0.965926, 0, 5, 12)
+[node name="Camera3D" type="Camera3D" parent="." unique_id=1289035386]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.7, 3)
 fov = 55.0
 script = ExtResource("2_cmra1")
 
-[node name="TreeGenerator3D" type="Node3D" parent="."]
+[node name="TreeGenerator3D" type="Node3D" parent="." unique_id=67577384]
 script = ExtResource("1_a2b3c")
-segment_length = 1.5
-angle_deg = 22.0
-branch_thickness = 0.35
-thickness_taper = 0.03
-vertical_falloff = 1.2
-branch_length_scale = 0.85
-collision_shape_type = 0
-capsule_wind_multiplier = 1.5
-stiffness = 80.0
-damping = 12.0
-wind_strength = 1.5
-wind_scale = 0.3
-wind_speed = 0.4
 seed = 30
 
-[node name="GameController" type="Node3D" parent="."]
+[node name="GameController" type="Node3D" parent="." unique_id=1404222453]
 script = ExtResource("3_gctrl")

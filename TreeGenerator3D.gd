@@ -6,11 +6,11 @@ signal branch_pruned(branch_index: int)
 @export var axiom: String = "X"
 @export var rule_X: String = "F[+X]F[-X]+X"
 @export var rule_F: String = "FF"
-@export var iterations: int = 5
+@export var iterations: int = 4
 
-@export var segment_length: float = 1.5
+@export var segment_length: float = 0.4
 @export var angle_deg: float = 22.0
-@export var branch_thickness: float = 0.35
+@export var branch_thickness: float = 0.15
 @export var thickness_taper: float = 0.03
 
 @export var base_branch_offset: float = 0.15
@@ -274,10 +274,36 @@ func should_spawn_branch(h: float) -> bool:
 	return rng.randf() < clamp(falloff * 0.85, 0.25, 0.7)
 
 func create_static_branch(path: Array, thicknesses: Array):
+	var body = StaticBody3D.new()
+	body.collision_layer = 2
+	body.collision_mask = 0
+	add_child(body)
+	body.name = "Trunk"
+
 	var mesh_node = MeshInstance3D.new()
-	add_child(mesh_node)
+	body.add_child(mesh_node)
 	mesh_node.material_override = tree_material
 	mesh_node.mesh = generate_tube_array(path, thicknesses)
+
+	for i in range(path.size() - 1):
+		var col = CollisionShape3D.new()
+		var cap = CapsuleShape3D.new()
+		var seg_dir = (path[i + 1] - path[i])
+		var seg_len = seg_dir.length()
+		var thick = thicknesses[i] if i < thicknesses.size() else 0.1
+		cap.radius = max(thick, 0.05)
+		cap.height = max(seg_len, 0.1)
+		col.shape = cap
+		var mid = (path[i] + path[i + 1]) * 0.5
+		col.position = mid
+		var up = seg_dir.normalized()
+		if up.length() > 0.001:
+			var right = up.cross(Vector3.RIGHT).normalized()
+			if right.length() < 0.01:
+				right = up.cross(Vector3.FORWARD).normalized()
+			var fwd = right.cross(up).normalized()
+			col.basis = Basis(right, up, fwd)
+		body.add_child(col)
 
 func create_branch(origin: Vector3, trunk_dir: Vector3, height_ratio: float, dynamic: bool, parent_index: int) -> int:
 	var branch_idx = branches.size()
@@ -411,6 +437,9 @@ func prune_branch(branch_index: int):
 		return
 	b.severed = true
 
+	for child_idx in b.get("children", []):
+		prune_branch(child_idx)
+
 	var segs = b.get("segments", [])
 	var jts = b.get("joints", [])
 
@@ -420,11 +449,16 @@ func prune_branch(branch_index: int):
 	if is_instance_valid(b.joint) and b.joint not in jts:
 		b.joint.queue_free()
 
+	var anchor = b.get("anchor")
+	if anchor and is_instance_valid(anchor):
+		anchor.queue_free()
+
 	for seg in segs:
 		if is_instance_valid(seg):
-			seg.gravity_scale = 3.0
+			seg.freeze = false
+			seg.gravity_scale = 1.0
 			seg.collision_layer = 8
-			seg.collision_mask = 1
+			seg.collision_mask = 1 | 8
 			seg.linear_damp = 0.2
 			seg.angular_damp = 0.3
 
@@ -479,32 +513,43 @@ func _start_fade_out(tip: RigidBody3D):
 		tween.tween_callback(tip.queue_free)
 
 func sever_branch(hit_collider: Node, hit_pos: Vector3, hit_normal: Vector3):
-	if hit_collider.has_meta("branch_idx"):
-		var idx = hit_collider.get_meta("branch_idx")
-		if idx >= 0 and idx < branches.size():
-			prune_branch(idx)
-			return
-	var best_idx = -1
-	var best_dist = 999.0
-	for i in range(branches.size()):
-		var b = branches[i]
-		if b.severed:
-			continue
-		var segs = b.get("segments", [])
-		for seg in segs:
-			if seg == hit_collider:
-				prune_branch(i)
-				return
-			if is_instance_valid(seg) and seg.is_inside_tree():
-				var d = seg.global_position.distance_to(hit_pos)
-				if d < best_dist and d < 3.0:
-					best_dist = d
-					best_idx = i
-		if is_instance_valid(b.tip) and b.tip == hit_collider:
-			prune_branch(i)
-			return
-	if best_idx >= 0:
-		prune_branch(best_idx)
+	if not hit_collider.has_meta("branch_idx"):
+		return
+	var branch_idx = hit_collider.get_meta("branch_idx")
+	var seg_idx = hit_collider.get_meta("seg_idx") if hit_collider.has_meta("seg_idx") else 0
+	if branch_idx < 0 or branch_idx >= branches.size():
+		return
+	var b = branches[branch_idx]
+	if b.severed:
+		return
+
+	var segs = b.get("segments", [])
+	var jts = b.get("joints", [])
+
+	if seg_idx == 0:
+		prune_branch(branch_idx)
+		return
+
+	var cut_jt_idx = seg_idx
+	if cut_jt_idx < jts.size() and is_instance_valid(jts[cut_jt_idx]):
+		jts[cut_jt_idx].queue_free()
+
+	for i in range(seg_idx, segs.size()):
+		var seg = segs[i]
+		if is_instance_valid(seg):
+			seg.freeze = false
+			seg.gravity_scale = 1.0
+			seg.collision_layer = 8
+			seg.collision_mask = 1 | 8
+			seg.linear_damp = 0.2
+			seg.angular_damp = 0.3
+
+	for child_idx in b.get("children", []):
+		prune_branch(child_idx)
+
+	if segs.size() > 0 and seg_idx < segs.size() and is_instance_valid(segs[seg_idx]):
+		var push_dir = (hit_normal + Vector3(0, 0.3, 0)).normalized()
+		segs[seg_idx].apply_central_impulse(push_dir * segs[seg_idx].mass * 1.5)
 
 func set_debug_visible(on: bool) -> void:
 	show_debug = on

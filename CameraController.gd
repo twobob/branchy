@@ -8,6 +8,7 @@ var is_orbiting: bool = false
 var orbit_sensitivity: float = 0.003
 var active_tool: String = "Hands"
 var velocity: Vector3 = Vector3.ZERO
+var player_height: float = 1.7
 var on_ground: bool = false
 var gravity: float = 20.0
 var jump_speed: float = 7.0
@@ -855,7 +856,7 @@ func _process(delta: float) -> void:
 
 	velocity.y -= gravity * delta
 
-	var ground_y = 1.7
+	var ground_y = player_height
 	if position.y + velocity.y * delta <= ground_y:
 		position.y = ground_y
 		velocity.y = 0.0

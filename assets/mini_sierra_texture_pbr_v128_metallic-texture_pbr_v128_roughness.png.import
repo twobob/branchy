@@ -3,9 +3,10 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://dw6q6g3b4yiwo"
-path="res://.godot/imported/mini_sierra_texture_pbr_v128_metallic-texture_pbr_v128_roughness.png-c92bfdd7e06f13f633318efcf66c6fda.ctex"
+path.s3tc="res://.godot/imported/mini_sierra_texture_pbr_v128_metallic-texture_pbr_v128_roughness.png-c92bfdd7e06f13f633318efcf66c6fda.s3tc.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc"],
+"vram_texture": true
 }
 generator_parameters={
 "md5": "cbfa6397994466adfe218fee8fd41a28"
@@ -14,11 +15,11 @@ generator_parameters={
 [deps]
 
 source_file="res://assets/mini_sierra_texture_pbr_v128_metallic-texture_pbr_v128_roughness.png"
-dest_files=["res://.godot/imported/mini_sierra_texture_pbr_v128_metallic-texture_pbr_v128_roughness.png-c92bfdd7e06f13f633318efcf66c6fda.ctex"]
+dest_files=["res://.godot/imported/mini_sierra_texture_pbr_v128_metallic-texture_pbr_v128_roughness.png-c92bfdd7e06f13f633318efcf66c6fda.s3tc.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0
@@ -40,4 +41,4 @@ process/normal_map_invert_y=false
 process/hdr_as_srgb=false
 process/hdr_clamp_exposure=false
 process/size_limit=0
-detect_3d/compress_to=1
+detect_3d/compress_to=0

@@ -1,6 +1,1 @@
-res://TreeGenerator3D.gd
-res://CameraController.gd
-res://GameController.gd
-res://Main.gd
-res://ToolController.gd
-res://playtest.gd
+res://main.tscn

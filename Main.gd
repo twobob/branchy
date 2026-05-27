@@ -298,7 +298,7 @@ func _process(delta: float):
 		var center = vp_size * 0.5
 		var origin = camera.project_ray_origin(center)
 		var normal = camera.project_ray_normal(center)
-		var end = origin + normal * 2.0
+		var end = origin + normal * 1.5
 		var space_state = get_world_3d().direct_space_state
 		var query = PhysicsRayQueryParameters3D.create(origin, end)
 		query.collision_mask = 2
@@ -320,7 +320,7 @@ func _process(delta: float):
 				return
 
 			var origin = camera.project_ray_origin(mouse_pos)
-			var ray_end = origin + camera.project_ray_normal(mouse_pos) * 2.5
+			var ray_end = origin + camera.project_ray_normal(mouse_pos) * 1.5
 
 			var space_state = get_world_3d().direct_space_state
 			var query = PhysicsRayQueryParameters3D.create(origin, ray_end)
