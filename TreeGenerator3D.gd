@@ -483,8 +483,7 @@ func prune_branch(branch_index: int):
 			)
 
 	branch_pruned.emit(branch_index)
-	for child_idx in b.children:
-		prune_branch(child_idx)
+
 
 func _start_fade_out(tip: RigidBody3D):
 	if not is_instance_valid(tip) or tip.is_queued_for_deletion():
@@ -512,95 +511,182 @@ func _start_fade_out(tip: RigidBody3D):
 		tween.tween_interval(1.5)
 		tween.tween_callback(tip.queue_free)
 
-func _cut_trunk(cut_pos: Vector3) -> void:
-	var cut_height = cut_pos.y - global_position.y
-	if cut_height < 0.1:
-		return
-
-	for i in range(branches.size()):
-		var b = branches[i]
-		if b.severed:
-			continue
-		var anchor = b.get("anchor")
-		if anchor and is_instance_valid(anchor):
-			var anchor_y = anchor.global_position.y
-			if anchor_y >= cut_pos.y - 0.5:
-				prune_branch(i)
-
-	var trunk_node = get_node_or_null("Trunk")
-	if trunk_node and is_instance_valid(trunk_node):
-		var rb = RigidBody3D.new()
-		rb.name = "FallenTrunk"
-		rb.mass = 50.0
-		rb.gravity_scale = 1.0
-		rb.collision_layer = 8
-		rb.collision_mask = 1
-
-		var trunk_meshes = []
-		for child in trunk_node.get_children():
-			if child is MeshInstance3D:
-				trunk_meshes.append(child)
-
-		if trunk_meshes.size() > 0:
-			var mi = trunk_meshes[0].duplicate()
-			rb.add_child(mi)
-
-			var col = CollisionShape3D.new()
-			var cap = CapsuleShape3D.new()
-			cap.radius = branch_thickness
-			cap.height = 2.0
-			col.shape = cap
-			rb.add_child(col)
-
-		rb.global_position = cut_pos + Vector3(0, 0.5, 0)
-		get_parent().add_child(rb)
-
-		var push = (cut_pos - global_position).normalized()
-		push.y = 0.3
-		rb.apply_central_impulse(push * 30.0)
-		rb.apply_torque_impulse(push.cross(Vector3.UP) * 20.0)
 
 func sever_branch(hit_collider: Node, hit_pos: Vector3, hit_normal: Vector3):
-	if hit_collider.name == "Trunk":
-		_cut_trunk(hit_pos)
+	# Works on ANY collider - trunk StaticBody3D or branch RigidBody3D
+	var mesh_slicer = get_node_or_null("/root/Main/MeshSlicer")
+	if not mesh_slicer:
+		mesh_slicer = MeshSlicer.new()
+		mesh_slicer.name = "MeshSlicer"
+		var main = get_node_or_null("/root/Main")
+		if main:
+			main.add_child(mesh_slicer)
+		else:
+			add_child(mesh_slicer)
+
+	# Find the MeshInstance3D on the hit collider
+	var hit_mesh_inst: MeshInstance3D = null
+	for child in hit_collider.get_children():
+		if child is MeshInstance3D:
+			hit_mesh_inst = child
+			break
+
+	if hit_mesh_inst == null or hit_mesh_inst.mesh == null:
+		# No mesh to cut - just use joint-based fallback
+		_fallback_sever(hit_collider, hit_pos, hit_normal)
 		return
+
+	# Build a cut plane at hit_pos perpendicular to the branch direction
+	var cut_plane_normal = hit_normal
+	# For branches, cut perpendicular to the branch direction
+	if hit_collider is RigidBody3D and hit_collider.has_meta("branch_idx"):
+		var branch_idx = hit_collider.get_meta("branch_idx")
+		if branch_idx >= 0 and branch_idx < branches.size():
+			var b = branches[branch_idx]
+			var segs = b.get("segments", [])
+			var seg_idx = hit_collider.get_meta("seg_idx") if hit_collider.has_meta("seg_idx") else 0
+			# Get branch direction from segment positions
+			if segs.size() > 1 and seg_idx < segs.size():
+				var prev_pos = segs[max(0, seg_idx - 1)].global_position if is_instance_valid(segs[max(0, seg_idx - 1)]) else hit_collider.global_position
+				var this_pos = hit_collider.global_position
+				cut_plane_normal = (this_pos - prev_pos).normalized()
+				if cut_plane_normal.length() < 0.01:
+					cut_plane_normal = Vector3.UP
+	elif hit_collider.name == "Trunk":
+		cut_plane_normal = Vector3.UP
+
+	# Create the slice transform: a thin box at the cut position
+	var slice_xform = Transform3D()
+	var up = cut_plane_normal
+	var right = up.cross(Vector3.FORWARD).normalized()
+	if right.length() < 0.01:
+		right = up.cross(Vector3.RIGHT).normalized()
+	var fwd = right.cross(up).normalized()
+	slice_xform.basis = Basis(right, up, fwd)
+	# Position relative to mesh instance
+	var local_hit = hit_mesh_inst.to_local(hit_pos)
+	slice_xform.origin = local_hit
+
+	# Perform the CSG slice
+	var result_meshes = mesh_slicer.slice_mesh(slice_xform, hit_mesh_inst.mesh, tree_material)
+	var mesh_a = result_meshes[0]  # Part connected to root
+	var mesh_b = result_meshes[1]  # Part that falls
+
+	if mesh_a == null or mesh_b == null or mesh_a.get_surface_count() == 0 or mesh_b.get_surface_count() == 0:
+		# CSG slice failed - use fallback
+		_fallback_sever(hit_collider, hit_pos, hit_normal)
+		return
+
+	# Replace original mesh with part A (stays)
+	hit_mesh_inst.mesh = mesh_a
+
+	# Create a new RigidBody3D for part B (falls)
+	var falling_piece = RigidBody3D.new()
+	falling_piece.name = "CutPiece_%d" % randi()
+	falling_piece.mass = 2.0
+	falling_piece.gravity_scale = 1.0
+	falling_piece.collision_layer = 8
+	falling_piece.collision_mask = 1 | 8
+	falling_piece.linear_damp = 0.3
+	falling_piece.angular_damp = 0.5
+
+	var piece_vis = MeshInstance3D.new()
+	piece_vis.mesh = mesh_b
+	piece_vis.material_override = tree_material
+	falling_piece.add_child(piece_vis)
+
+	# Add collision to the falling piece
+	var col = CollisionShape3D.new()
+	var box = BoxShape3D.new()
+	var aabb = mesh_b.get_aabb()
+	box.size = aabb.size.clamp(Vector3(0.05, 0.05, 0.05), Vector3(5, 5, 5))
+	col.shape = box
+	col.position = aabb.get_center()
+	falling_piece.add_child(col)
+
+	# Position the falling piece at the original mesh's world position
+	falling_piece.global_position = hit_mesh_inst.global_position
+	falling_piece.global_rotation = hit_mesh_inst.global_rotation
+	get_parent().add_child(falling_piece)
+
+	# Push it away from the cut
+	var push_dir = -cut_plane_normal
+	push_dir.y = max(push_dir.y, 0.2)
+	falling_piece.apply_central_impulse(push_dir * falling_piece.mass * 3.0)
+	falling_piece.apply_torque_impulse(Vector3(randf_range(-1,1), randf_range(-1,1), randf_range(-1,1)) * 2.0)
+
+	# Now handle branch connectivity - everything above the cut falls
+	if hit_collider.has_meta("branch_idx"):
+		var branch_idx = hit_collider.get_meta("branch_idx")
+		var seg_idx = hit_collider.get_meta("seg_idx") if hit_collider.has_meta("seg_idx") else 0
+		if branch_idx >= 0 and branch_idx < branches.size():
+			var b = branches[branch_idx]
+			var segs = b.get("segments", [])
+			var jts = b.get("joints", [])
+			# Free the joint at the cut point
+			if seg_idx < jts.size() and is_instance_valid(jts[seg_idx]):
+				jts[seg_idx].queue_free()
+			# All segments AFTER the cut point fall with gravity
+			for i in range(seg_idx + 1, segs.size()):
+				var seg = segs[i]
+				if is_instance_valid(seg):
+					_release_segment(seg)
+			# All child branches fall too
+			for child_idx in b.get("children", []):
+				prune_branch(child_idx)
+
+	elif hit_collider.name == "Trunk":
+		# Trunk was cut - everything above the cut height falls
+		var cut_y = hit_pos.y
+		for i in range(branches.size()):
+			var b = branches[i]
+			if b.severed:
+				continue
+			var anchor = b.get("anchor")
+			if anchor and is_instance_valid(anchor):
+				if anchor.global_position.y >= cut_y - 0.3:
+					prune_branch(i)
+
+	# Auto-cleanup falling piece after 10 seconds
+	var tw = falling_piece.create_tween()
+	tw.tween_interval(8.0)
+	tw.tween_callback(falling_piece.queue_free)
+
+
+func _release_segment(seg: RigidBody3D) -> void:
+	seg.freeze = false
+	seg.gravity_scale = 1.0
+	seg.collision_layer = 8
+	seg.collision_mask = 1 | 8
+	seg.linear_damp = 0.3
+	seg.angular_damp = 0.5
+	seg.apply_central_impulse(Vector3(randf_range(-0.5, 0.5), 0.2, randf_range(-0.5, 0.5)) * seg.mass)
+
+
+func _fallback_sever(hit_collider: Node, hit_pos: Vector3, hit_normal: Vector3):
+	# Joint-based fallback for when CSG slicing fails
+	if hit_collider.name == "Trunk":
+		var cut_y = hit_pos.y
+		for i in range(branches.size()):
+			var b = branches[i]
+			if b.severed:
+				continue
+			var anchor = b.get("anchor")
+			if anchor and is_instance_valid(anchor):
+				if anchor.global_position.y >= cut_y - 0.3:
+					prune_branch(i)
+		return
+
 	if not hit_collider.has_meta("branch_idx"):
 		return
 	var branch_idx = hit_collider.get_meta("branch_idx")
-	var seg_idx = hit_collider.get_meta("seg_idx") if hit_collider.has_meta("seg_idx") else 0
 	if branch_idx < 0 or branch_idx >= branches.size():
 		return
 	var b = branches[branch_idx]
 	if b.severed:
 		return
+	prune_branch(branch_idx)
 
-	var segs = b.get("segments", [])
-	var jts = b.get("joints", [])
-
-	if seg_idx == 0:
-		prune_branch(branch_idx)
-		return
-
-	var cut_jt_idx = seg_idx
-	if cut_jt_idx < jts.size() and is_instance_valid(jts[cut_jt_idx]):
-		jts[cut_jt_idx].queue_free()
-
-	for i in range(seg_idx, segs.size()):
-		var seg = segs[i]
-		if is_instance_valid(seg):
-			seg.freeze = false
-			seg.gravity_scale = 1.0
-			seg.collision_layer = 8
-			seg.collision_mask = 1 | 8
-			seg.linear_damp = 0.2
-			seg.angular_damp = 0.3
-
-	for child_idx in b.get("children", []):
-		prune_branch(child_idx)
-
-	if segs.size() > 0 and seg_idx < segs.size() and is_instance_valid(segs[seg_idx]):
-		var push_dir = (hit_normal + Vector3(0, 0.3, 0)).normalized()
-		segs[seg_idx].apply_central_impulse(push_dir * segs[seg_idx].mass * 1.5)
 
 func set_debug_visible(on: bool) -> void:
 	show_debug = on

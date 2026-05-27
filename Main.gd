@@ -293,20 +293,18 @@ func _process(delta: float):
 			saw_instance.visible = false
 
 	if camera and laser_dot:
-		var tc = camera.get_node_or_null("ToolController")
-		if tc and tc.has_method("get_tool_tip_global"):
-			var tip_origin = tc.get_tool_tip_global()
-			var tip_dir = tc.get_tool_direction()
-			var tip_end = tip_origin + tip_dir * 1.2
-			var space_state = get_world_3d().direct_space_state
-			var query = PhysicsRayQueryParameters3D.create(tip_origin, tip_end)
-			query.collision_mask = 2
-			var result = space_state.intersect_ray(query)
-			if result:
-				laser_dot.global_position = result.position
-				laser_dot.visible = true
-			else:
-				laser_dot.visible = false
+		var vp = get_viewport()
+		var center = vp.get_visible_rect().size * 0.5
+		var origin = camera.project_ray_origin(center)
+		var normal = camera.project_ray_normal(center)
+		var end = origin + normal * 3.0
+		var space_state = get_world_3d().direct_space_state
+		var query = PhysicsRayQueryParameters3D.create(origin, end)
+		query.collision_mask = 2
+		var result = space_state.intersect_ray(query)
+		if result:
+			laser_dot.global_position = result.position
+			laser_dot.visible = true
 		else:
 			laser_dot.visible = false
 
@@ -320,15 +318,9 @@ func _process(delta: float):
 			if mouse_pos.x < 50 and mouse_pos.y < 80:
 				return
 
-			var tc = camera.get_node_or_null("ToolController")
-			var cut_origin: Vector3
-			var cut_end: Vector3
-			if tc and tc.has_method("get_tool_tip_global"):
-				cut_origin = tc.get_tool_tip_global()
-				cut_end = cut_origin + tc.get_tool_direction() * 1.2
-			else:
-				cut_origin = camera.project_ray_origin(mouse_pos)
-				cut_end = cut_origin + camera.project_ray_normal(mouse_pos) * 1.5
+			var vp_center = get_viewport().get_visible_rect().size * 0.5
+			var cut_origin = camera.project_ray_origin(vp_center)
+			var cut_end = cut_origin + camera.project_ray_normal(vp_center) * 3.0
 
 			var space_state = get_world_3d().direct_space_state
 			var query = PhysicsRayQueryParameters3D.create(cut_origin, cut_end)
@@ -337,7 +329,7 @@ func _process(delta: float):
 			var result = space_state.intersect_ray(query)
 			if result:
 				var hit_collider = result.collider
-				if hit_collider is RigidBody3D and tree_gen:
+				if (hit_collider is RigidBody3D or hit_collider is StaticBody3D) and tree_gen:
 					var hit_pos = result.position
 					var hit_normal = result.normal
 
