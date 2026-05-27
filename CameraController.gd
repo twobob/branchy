@@ -522,6 +522,7 @@ func _ready() -> void:
 		"Space - Jump",
 		"Right-Click Drag - Look",
 		"1-6 - Select Tool, H - Hands",
+		"R - Tool On/Off",
 		"LMB Hold - Cut (3s)",
 	]
 	for k in keys:
@@ -771,6 +772,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		if event.keycode == KEY_F:
 			_toggle_climbing()
 			return
+		if event.keycode == KEY_R:
+			_toggle_tool_active()
+			return
 	var focus_owner = get_viewport().gui_get_focus_owner()
 	if focus_owner and focus_owner is LineEdit:
 		if event is InputEventMouseButton and event.is_pressed():
@@ -946,3 +950,12 @@ func _toggle_climbing() -> void:
 				var dir = to_trunk.normalized()
 				position.x = hit.global_position.x - dir.x * 0.8
 				position.z = hit.global_position.z - dir.z * 0.8
+
+
+func _toggle_tool_active() -> void:
+	var tc = get_node_or_null("ToolController")
+	if tc:
+		if tc.tool_active:
+			tc.deactivate()
+		else:
+			tc.activate()

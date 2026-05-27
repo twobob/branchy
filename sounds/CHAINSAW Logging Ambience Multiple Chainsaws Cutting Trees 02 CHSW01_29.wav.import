@@ -1,0 +1,24 @@
+[remap]
+
+importer="wav"
+type="AudioStreamWAV"
+uid="uid://47g23la0nccm"
+path="res://.godot/imported/CHAINSAW Logging Ambience Multiple Chainsaws Cutting Trees 02 CHSW01_29.wav-a5232e755f0696d8baa4818f3162270b.sample"
+
+[deps]
+
+source_file="res://sounds/CHAINSAW Logging Ambience Multiple Chainsaws Cutting Trees 02 CHSW01_29.wav"
+dest_files=["res://.godot/imported/CHAINSAW Logging Ambience Multiple Chainsaws Cutting Trees 02 CHSW01_29.wav-a5232e755f0696d8baa4818f3162270b.sample"]
+
+[params]
+
+force/8_bit=false
+force/mono=false
+force/max_rate=false
+force/max_rate_hz=44100
+edit/trim=false
+edit/normalize=false
+edit/loop_mode=0
+edit/loop_begin=0
+edit/loop_end=-1
+compress/mode=2

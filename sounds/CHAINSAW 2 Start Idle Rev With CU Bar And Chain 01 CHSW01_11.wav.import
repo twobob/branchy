@@ -1,0 +1,24 @@
+[remap]
+
+importer="wav"
+type="AudioStreamWAV"
+uid="uid://bb70rx0qa3d4r"
+path="res://.godot/imported/CHAINSAW 2 Start Idle Rev With CU Bar And Chain 01 CHSW01_11.wav-97a2790bb17f3dcfc9e4cd5bf13e6366.sample"
+
+[deps]
+
+source_file="res://sounds/CHAINSAW 2 Start Idle Rev With CU Bar And Chain 01 CHSW01_11.wav"
+dest_files=["res://.godot/imported/CHAINSAW 2 Start Idle Rev With CU Bar And Chain 01 CHSW01_11.wav-97a2790bb17f3dcfc9e4cd5bf13e6366.sample"]
+
+[params]
+
+force/8_bit=false
+force/mono=false
+force/max_rate=false
+force/max_rate_hz=44100
+edit/trim=false
+edit/normalize=false
+edit/loop_mode=0
+edit/loop_begin=0
+edit/loop_end=-1
+compress/mode=2

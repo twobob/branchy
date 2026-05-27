@@ -4,6 +4,8 @@ var active_tool_name: String = "none"
 var tool_holder: Node3D = null
 var current_model: Node3D = null
 var is_cutting: bool = false
+var tool_active: bool = false
+var tool_tip_offset: Vector3 = Vector3(0, 0, -0.6)
 
 var tool_configs: Dictionary = {}
 var rest_pos: Vector3 = Vector3(0.35, -0.35, -0.55)
@@ -110,6 +112,23 @@ func set_active_tool(tool_name: String) -> void:
 	current_model.rotation_degrees = cfg.rotation_deg
 	current_model.position = cfg.offset
 
+func get_tool_tip_global() -> Vector3:
+	if is_instance_valid(tool_holder):
+		return tool_holder.global_position + tool_holder.global_transform.basis * tool_tip_offset
+	return global_position
+
+func get_tool_direction() -> Vector3:
+	if is_instance_valid(tool_holder):
+		return -tool_holder.global_transform.basis.z.normalized()
+	return -global_transform.basis.z.normalized()
+
+func activate() -> void:
+	tool_active = true
+
+func deactivate() -> void:
+	tool_active = false
+	is_cutting = false
+
 func select_tool(tool_name: String) -> void:
 	set_active_tool(tool_name)
 
@@ -119,7 +138,7 @@ func get_tool_type() -> String:
 	return "none"
 
 func _process(delta: float) -> void:
-	is_cutting = Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT)
+	is_cutting = Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) and tool_active
 	var time = Time.get_ticks_msec() / 1000.0
 
 	var target_pos = rest_pos
@@ -127,19 +146,36 @@ func _process(delta: float) -> void:
 	var bob_x = cos(time * 1.3) * 0.003
 	target_pos += Vector3(bob_x, bob_y, 0.0)
 
+	if tool_active and not is_cutting:
+		# Idle vibration when tool is running but not cutting
+		var idle_vib = Vector3(
+			randf_range(-0.002, 0.002),
+			randf_range(-0.002, 0.002),
+			0.0
+		)
+		target_pos += idle_vib
+
 	if is_cutting:
 		target_pos.z -= 0.1
+		# Heavy vibration when cutting
 		var vib = Vector3(
-			randf_range(-0.005, 0.005),
-			randf_range(-0.005, 0.005),
+			randf_range(-0.008, 0.008),
+			randf_range(-0.008, 0.008),
 			0.0
 		)
 		target_pos += vib
 
 	tool_holder.position = tool_holder.position.lerp(target_pos, 10.0 * delta)
 
-	if get_tool_type() == "mini_saw" and is_instance_valid(current_model):
-		for child in current_model.get_children():
-			if child is MeshInstance3D:
-				var speed = 40.0 if is_cutting else 0.0
-				child.rotate_object_local(Vector3.RIGHT, speed * delta)
+	# Rotate blade meshes when tool is active
+	if is_instance_valid(current_model):
+		var tool_type = get_tool_type()
+		if tool_type == "mini_saw":
+			for child in current_model.get_children():
+				if child is MeshInstance3D:
+					var speed = 40.0 if tool_active else 0.0
+					child.rotate_object_local(Vector3.RIGHT, speed * delta)
+		if tool_type == "chainsaw" and tool_active:
+			# Slight rocking motion when chainsaw is running
+			var rock = sin(time * 15.0) * 0.5 if is_cutting else sin(time * 8.0) * 0.3
+			current_model.rotation_degrees.z = rock

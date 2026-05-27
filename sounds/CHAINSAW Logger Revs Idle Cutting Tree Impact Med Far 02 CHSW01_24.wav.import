@@ -1,0 +1,24 @@
+[remap]
+
+importer="wav"
+type="AudioStreamWAV"
+uid="uid://cylwx4toh5ycu"
+path="res://.godot/imported/CHAINSAW Logger Revs Idle Cutting Tree Impact Med Far 02 CHSW01_24.wav-8e21740ac5b630ec0c6b18b1ec9e2871.sample"
+
+[deps]
+
+source_file="res://sounds/CHAINSAW Logger Revs Idle Cutting Tree Impact Med Far 02 CHSW01_24.wav"
+dest_files=["res://.godot/imported/CHAINSAW Logger Revs Idle Cutting Tree Impact Med Far 02 CHSW01_24.wav-8e21740ac5b630ec0c6b18b1ec9e2871.sample"]
+
+[params]
+
+force/8_bit=false
+force/mono=false
+force/max_rate=false
+force/max_rate_hz=44100
+edit/trim=false
+edit/normalize=false
+edit/loop_mode=0
+edit/loop_begin=0
+edit/loop_end=-1
+compress/mode=2
