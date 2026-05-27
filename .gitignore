@@ -1,2 +1,6 @@
-﻿sounds/*.wav
+﻿.godot/
+sounds/*.wav
 sounds/*.wav.import
+*.tmp
+*.log
+godot_runtime.log
