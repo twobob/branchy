@@ -7,6 +7,11 @@ var audio_enabled: bool = false
 var is_orbiting: bool = false
 var orbit_sensitivity: float = 0.003
 var active_tool: String = "Hands"
+var is_climbing: bool = false
+var climb_target: Node3D = null
+var climb_height: float = 0.0
+const CLIMB_STEP: float = 0.5
+const CLIMB_SPEED: float = 2.0
 var velocity: Vector3 = Vector3.ZERO
 var player_height: float = 1.7
 var on_ground: bool = false
@@ -761,6 +766,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		if key_map.has(event.keycode):
 			select_tool(key_map[event.keycode])
 			return
+		if event.keycode == KEY_E:
+			_toggle_climbing()
+			return
 	var focus_owner = get_viewport().gui_get_focus_owner()
 	if focus_owner and focus_owner is LineEdit:
 		if event is InputEventMouseButton and event.is_pressed():
@@ -829,6 +837,43 @@ func _process(delta: float) -> void:
 	if is_typing:
 		return
 		
+	if is_climbing and climb_target and is_instance_valid(climb_target):
+		var climb_pos = climb_target.global_position
+		if Input.is_key_pressed(KEY_W):
+			climb_height += CLIMB_SPEED * delta
+		if Input.is_key_pressed(KEY_S):
+			climb_height -= CLIMB_SPEED * delta
+			if climb_height < player_height:
+				climb_height = player_height
+				is_climbing = false
+		if Input.is_key_pressed(KEY_A):
+			var angle = CLIMB_SPEED * delta
+			var offset = position - climb_pos
+			offset.y = 0
+			var dist = offset.length()
+			if dist < 0.1:
+				dist = 1.0
+			var current_angle = atan2(offset.z, offset.x)
+			current_angle += angle
+			position.x = climb_pos.x + cos(current_angle) * dist
+			position.z = climb_pos.z + sin(current_angle) * dist
+			rotation.y += angle
+		if Input.is_key_pressed(KEY_D):
+			var angle = -CLIMB_SPEED * delta
+			var offset = position - climb_pos
+			offset.y = 0
+			var dist = offset.length()
+			if dist < 0.1:
+				dist = 1.0
+			var current_angle = atan2(offset.z, offset.x)
+			current_angle += angle
+			position.x = climb_pos.x + cos(current_angle) * dist
+			position.z = climb_pos.z + sin(current_angle) * dist
+			rotation.y += angle
+		position.y = climb_height
+		velocity = Vector3.ZERO
+		return
+
 	var forward_vec = -global_transform.basis.z
 	forward_vec.y = 0
 	if forward_vec.length_squared() > 0.001:
@@ -872,3 +917,30 @@ func _process(delta: float) -> void:
 
 	if t_move.length() > 0:
 		position += t_move.normalized() * move_speed * delta
+
+
+func _toggle_climbing() -> void:
+	if is_climbing:
+		is_climbing = false
+		climb_target = null
+		return
+
+	var space_state = get_world_3d().direct_space_state
+	var vp_center = get_viewport().get_visible_rect().size * 0.5
+	var origin = project_ray_origin(vp_center)
+	var ray_end = origin + project_ray_normal(vp_center) * 3.0
+	var query = PhysicsRayQueryParameters3D.create(origin, ray_end)
+	query.collision_mask = 2
+	var result = space_state.intersect_ray(query)
+	if result:
+		var hit = result.collider
+		if hit:
+			is_climbing = true
+			climb_target = hit
+			climb_height = position.y
+			var to_trunk = hit.global_position - position
+			to_trunk.y = 0
+			if to_trunk.length() > 0.5:
+				var dir = to_trunk.normalized()
+				position.x = hit.global_position.x - dir.x * 0.8
+				position.z = hit.global_position.z - dir.z * 0.8

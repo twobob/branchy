@@ -1,1 +1,4 @@
 res://main.tscn
+res://CameraController.gd
+res://Main.gd
+res://TreeGenerator3D.gd

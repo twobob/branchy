@@ -512,7 +512,58 @@ func _start_fade_out(tip: RigidBody3D):
 		tween.tween_interval(1.5)
 		tween.tween_callback(tip.queue_free)
 
+func _cut_trunk(cut_pos: Vector3) -> void:
+	var cut_height = cut_pos.y - global_position.y
+	if cut_height < 0.1:
+		return
+
+	for i in range(branches.size()):
+		var b = branches[i]
+		if b.severed:
+			continue
+		var anchor = b.get("anchor")
+		if anchor and is_instance_valid(anchor):
+			var anchor_y = anchor.global_position.y
+			if anchor_y >= cut_pos.y - 0.5:
+				prune_branch(i)
+
+	var trunk_node = get_node_or_null("Trunk")
+	if trunk_node and is_instance_valid(trunk_node):
+		var rb = RigidBody3D.new()
+		rb.name = "FallenTrunk"
+		rb.mass = 50.0
+		rb.gravity_scale = 1.0
+		rb.collision_layer = 8
+		rb.collision_mask = 1
+
+		var trunk_meshes = []
+		for child in trunk_node.get_children():
+			if child is MeshInstance3D:
+				trunk_meshes.append(child)
+
+		if trunk_meshes.size() > 0:
+			var mi = trunk_meshes[0].duplicate()
+			rb.add_child(mi)
+
+			var col = CollisionShape3D.new()
+			var cap = CapsuleShape3D.new()
+			cap.radius = branch_thickness
+			cap.height = 2.0
+			col.shape = cap
+			rb.add_child(col)
+
+		rb.global_position = cut_pos + Vector3(0, 0.5, 0)
+		get_parent().add_child(rb)
+
+		var push = (cut_pos - global_position).normalized()
+		push.y = 0.3
+		rb.apply_central_impulse(push * 30.0)
+		rb.apply_torque_impulse(push.cross(Vector3.UP) * 20.0)
+
 func sever_branch(hit_collider: Node, hit_pos: Vector3, hit_normal: Vector3):
+	if hit_collider.name == "Trunk":
+		_cut_trunk(hit_pos)
+		return
 	if not hit_collider.has_meta("branch_idx"):
 		return
 	var branch_idx = hit_collider.get_meta("branch_idx")

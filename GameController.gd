@@ -34,7 +34,6 @@ var active_tool: String = "Chainsaw"
 var tree_generator: Node3D
 var camera_controller: Camera3D
 var hopper_area: Area3D
-var wood_chipper_root: Node3D
 
 
 var canvas_layer: CanvasLayer
@@ -71,7 +70,6 @@ func _ready() -> void:
 	add_child(hologram_mesh_instance)
 	
 
-	_setup_wood_chipper()
 	
 
 	_setup_hud()
@@ -107,53 +105,7 @@ func select_tool(tool_name: String) -> void:
 		camera_controller.select_tool(tool_name)
 
 func _setup_wood_chipper() -> void:
-
-	var chipper_mesh = load("res://assets/wood_chipper.obj")
-	if not chipper_mesh:
-		print("Warning: Could not load wood_chipper.obj")
-		return
-		
-
-	wood_chipper_root = Node3D.new()
-	wood_chipper_root.name = "WoodChipper"
-	add_child(wood_chipper_root)
-	
-	var chipper_vis = MeshInstance3D.new()
-	chipper_vis.name = "Visual"
-	chipper_vis.mesh = chipper_mesh
-	
-
-	var mat = StandardMaterial3D.new()
-	mat.albedo_color = Color(0.85, 0.45, 0.1)
-	mat.roughness = 0.4
-	mat.metallic = 0.7
-	chipper_vis.material_override = mat
-	wood_chipper_root.add_child(chipper_vis)
-	
-
-	var center_offset = Vector3(1952.436, -739.587, 82.197)
-	chipper_vis.position = -center_offset
-	
-
-	wood_chipper_root.scale = Vector3(0.0008, 0.0008, 0.0008)
-	
-
-	wood_chipper_root.position = Vector3(4.0, 0.0, 2.0)
-	wood_chipper_root.rotation_degrees = Vector3(-90, 0, 0)
-	
-
-	hopper_area = Area3D.new()
-	hopper_area.name = "HopperArea"
-	add_child(hopper_area)
-	hopper_area.position = Vector3(4.0, 1.2, 2.0)
-	
-	var col = CollisionShape3D.new()
-	var box = BoxShape3D.new()
-	box.size = Vector3(2.5, 2.0, 2.5)
-	col.shape = box
-	hopper_area.add_child(col)
-	
-	hopper_area.body_entered.connect(_on_hopper_body_entered)
+	pass
 
 func _setup_hud() -> void:
 	canvas_layer = CanvasLayer.new()
