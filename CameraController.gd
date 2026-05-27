@@ -509,7 +509,7 @@ func _ready() -> void:
 	legend_margin.add_child(legend_vbox)
 	
 	var legend_title = Label.new()
-	legend_title.text = "Camera Controls"
+	legend_title.text = "Controls"
 	legend_title.add_theme_color_override("font_color", Color(0.85, 0.67, 0.28, 1.0))
 	legend_title.add_theme_font_size_override("font_size", 14)
 	legend_vbox.add_child(legend_title)
@@ -517,10 +517,12 @@ func _ready() -> void:
 	var keys = [
 		"W/S - Forward / Back",
 		"A/D - Strafe Left / Right",
-		"Q/E - Down / Up",
-		"Right-Click Drag - Orbit",
-		"Left/Right - Orbit",
-		"Scroll - Zoom",
+		"Q/E - Up / Down (Climb)",
+		"F - Toggle Climb",
+		"Space - Jump",
+		"Right-Click Drag - Look",
+		"1-6 - Select Tool, H - Hands",
+		"LMB Hold - Cut (3s)",
 	]
 	for k in keys:
 		var lbl = Label.new()
@@ -766,7 +768,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		if key_map.has(event.keycode):
 			select_tool(key_map[event.keycode])
 			return
-		if event.keycode == KEY_E:
+		if event.keycode == KEY_F:
 			_toggle_climbing()
 			return
 	var focus_owner = get_viewport().gui_get_focus_owner()
@@ -839,9 +841,9 @@ func _process(delta: float) -> void:
 		
 	if is_climbing and climb_target and is_instance_valid(climb_target):
 		var climb_pos = climb_target.global_position
-		if Input.is_key_pressed(KEY_W):
+		if Input.is_key_pressed(KEY_Q):
 			climb_height += CLIMB_SPEED * delta
-		if Input.is_key_pressed(KEY_S):
+		if Input.is_key_pressed(KEY_E):
 			climb_height -= CLIMB_SPEED * delta
 			if climb_height < player_height:
 				climb_height = player_height
