@@ -2,14 +2,11 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://co1ji8c2a6nja"
+uid="uid://n4jdd4euf1t5"
 path.s3tc="res://.godot/imported/animated_chainsaw_texture_diff.png-3321bee6950b3e87abb348296302e2fe.s3tc.ctex"
 metadata={
 "imported_formats": ["s3tc_bptc"],
 "vram_texture": true
-}
-generator_parameters={
-"md5": "a9860fe62364f838df07f4f5ec639215"
 }
 
 [deps]

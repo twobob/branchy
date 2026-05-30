@@ -360,8 +360,9 @@ func create_branch(origin: Vector3, trunk_dir: Vector3, height_ratio: float, dyn
 		body.mass = seg_len * 0.3
 		body.gravity_scale = 0.0
 		body.position = dir * seg_len * (seg_i + 1)
-		body.linear_damp = 1.5
-		body.angular_damp = 2.0
+		body.linear_damp = 0.5
+		body.angular_damp = 0.8
+		body.can_sleep = false
 
 		var col = CollisionShape3D.new()
 		var cap = CapsuleShape3D.new()
@@ -514,15 +515,11 @@ func _start_fade_out(tip: RigidBody3D):
 
 func sever_branch(hit_collider: Node, hit_pos: Vector3, hit_normal: Vector3):
 	# Works on ANY collider - trunk StaticBody3D or branch RigidBody3D
-	var mesh_slicer = get_node_or_null("/root/Main/MeshSlicer")
+	var mesh_slicer = get_node_or_null("MeshSlicer")
 	if not mesh_slicer:
 		mesh_slicer = MeshSlicer.new()
 		mesh_slicer.name = "MeshSlicer"
-		var main = get_node_or_null("/root/Main")
-		if main:
-			main.add_child(mesh_slicer)
-		else:
-			add_child(mesh_slicer)
+		add_child(mesh_slicer)
 
 	# Find the MeshInstance3D on the hit collider
 	var hit_mesh_inst: MeshInstance3D = null
@@ -660,6 +657,7 @@ func _release_segment(seg: RigidBody3D) -> void:
 	seg.collision_mask = 1 | 8
 	seg.linear_damp = 0.3
 	seg.angular_damp = 0.5
+	seg.can_sleep = true
 	seg.apply_central_impulse(Vector3(randf_range(-0.5, 0.5), 0.2, randf_range(-0.5, 0.5)) * seg.mass)
 
 
@@ -717,6 +715,9 @@ func _expand_bounds_recursive(node: Node, bounds: AABB) -> AABB:
 
 func _physics_process(delta):
 	time_accum += delta
+	# Every 60 frames, check for orphaned branches
+	if Engine.get_physics_frames() % 60 == 0:
+		_check_orphaned_branches()
 	for b in branches:
 		if b.severed:
 			continue
@@ -727,8 +728,32 @@ func _physics_process(delta):
 		else:
 			apply_wind(b, delta)
 
+func _check_orphaned_branches():
+	for i in range(branches.size()):
+		var b = branches[i]
+		if b.severed:
+			continue
+		# Check if this branch is still connected to the tree
+		var connected = false
+		# Root joint connects branch to parent
+		var root_jt = b.get("joint")
+		if root_jt and is_instance_valid(root_jt):
+			connected = true
+		# Also check anchor
+		var anchor = b.get("anchor")
+		if anchor and is_instance_valid(anchor):
+			connected = true
+		# Check parent branch - if parent is severed, we are too
+		var parent_idx = b.get("parent_index", -1)
+		if parent_idx >= 0 and parent_idx < branches.size():
+			var parent_b = branches[parent_idx]
+			if parent_b.severed:
+				connected = false
+		if not connected:
+			prune_branch(i)
+
 func apply_wind_seg(seg, delta):
-	if not is_instance_valid(seg) or seg.sleeping:
+	if not is_instance_valid(seg):
 		return
 	var p = seg.global_position * wind_scale
 	var time_offset = time_accum * wind_speed * 5.0
