@@ -21,6 +21,8 @@ var walk_speed: float = 5.0
 var tool_cards: Dictionary = {}
 var drawer_open: bool = false
 var drawer_panel: PanelContainer
+var climb_indicator: PanelContainer
+var climb_look_offset: float = 0.0
 
 var score: int = 0
 var level: int = 4
@@ -283,9 +285,6 @@ func _ready() -> void:
 					rule_status.text = "VALID Branches rendered: %d" % tree_gen.branches.size()
 					rule_status.add_theme_color_override("font_color", Color.GREEN)
 					break
-			await get_tree().process_frame
-			await get_tree().process_frame
-			frame_tree()
 	)
 	
 	_add_slider(drawer_vbox, "Iterations", "iterations", 1, 10, 1, tree_gen, true)
@@ -532,6 +531,34 @@ func _ready() -> void:
 		lbl.add_theme_font_size_override("font_size", 11)
 		legend_vbox.add_child(lbl)
 		
+	# Climb indicator UI setup
+	climb_indicator = PanelContainer.new()
+	climb_indicator.name = "ClimbIndicator"
+	climb_indicator.custom_minimum_size = Vector2(240, 45)
+	climb_indicator.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	climb_indicator.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	climb_indicator.position = Vector2(-120, 95)
+	
+	var climb_style = _create_glass_style(Color(0.08, 0.45, 0.65, 0.85), Color(0.12, 0.75, 1.0, 0.8), 8)
+	climb_indicator.add_theme_stylebox_override("panel", climb_style)
+	canvas.add_child(climb_indicator)
+	
+	var climb_margin = MarginContainer.new()
+	climb_margin.add_theme_constant_override("margin_left", 15)
+	climb_margin.add_theme_constant_override("margin_right", 15)
+	climb_indicator.add_child(climb_margin)
+	
+	var climb_lbl = Label.new()
+	climb_lbl.name = "ClimbLabel"
+	climb_lbl.text = "[CLIMBING ACTIVE]"
+	climb_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	climb_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	climb_lbl.add_theme_color_override("font_color", Color(1.0, 0.95, 0.8, 1.0))
+	climb_lbl.add_theme_font_size_override("font_size", 14)
+	climb_margin.add_child(climb_lbl)
+	
+	climb_indicator.visible = false
+		
 	await get_tree().process_frame
 	await get_tree().process_frame
 	frame_tree()
@@ -664,9 +691,6 @@ func _add_slider(panel: Control, label_text: String, prop_name: String, min_val:
 				if rule_status:
 					rule_status.text = "VALID Branches rendered: %d" % tree_gen.branches.size()
 					rule_status.add_theme_color_override("font_color", Color.GREEN)
-				await get_tree().process_frame
-				await get_tree().process_frame
-				frame_tree()
 	)
 
 func frame_tree() -> void:
@@ -685,11 +709,18 @@ func frame_tree() -> void:
 	var half_fov = deg_to_rad(fov * 0.5)
 	var required_dist = (max_dim * 0.7) / tan(half_fov)
 	
+	# Stand on the ground at player_height (1.7) at a perfect eye-level viewing distance (between 3.5m and 6.0m)
+	var standing_dist = clamp(required_dist * 0.35, 3.5, 6.0)
 	var angle_rad = deg_to_rad(35.0)
-	var offset = Vector3(cos(angle_rad), 0.45, sin(angle_rad)).normalized() * required_dist
+	position = Vector3(
+		center.x + cos(angle_rad) * standing_dist,
+		player_height,
+		center.z + sin(angle_rad) * standing_dist
+	)
 	
-	position = center + offset
-	look_at(center - Vector3(0, tree_height * 0.1, 0), Vector3.UP)
+	# Look directly at the trunk of the tree (height of 1.5m above tree root)
+	var look_target = Vector3(center.x, 1.5, center.z)
+	look_at(look_target, Vector3.UP)
 
 func _validate_rule_ui(rule_text: String, status_label: Label) -> void:
 	var tree_gen = get_node_or_null("../TreeGenerator3D")
@@ -824,6 +855,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		rotation.x = new_x
 
 func _process(delta: float) -> void:
+	if climb_indicator:
+		climb_indicator.visible = is_climbing
+		
 	var label = get_node_or_null("CanvasLayer/FPSLabel")
 	if label:
 		label.text = "FPS: %d" % Engine.get_frames_per_second()
@@ -844,39 +878,66 @@ func _process(delta: float) -> void:
 		return
 		
 	if is_climbing and climb_target and is_instance_valid(climb_target):
-		var climb_pos = climb_target.global_position
+		# Fetch the 3D path coordinates to determine climb limits and tracking
+		var local_path = climb_target.get_meta("path") if climb_target.has_meta("path") else []
+		var min_climb_y = player_height
+		var max_climb_y = INF
+		if local_path.size() >= 2:
+			var base_p = climb_target.to_global(local_path[0])
+			var tip_p = climb_target.to_global(local_path[-1])
+			min_climb_y = base_p.y + 0.2
+			max_climb_y = tip_p.y - 0.2
+			
 		if Input.is_key_pressed(KEY_Q):
 			climb_height += CLIMB_SPEED * delta
+			if climb_height > max_climb_y:
+				climb_height = max_climb_y
 		if Input.is_key_pressed(KEY_E):
 			climb_height -= CLIMB_SPEED * delta
-			if climb_height < player_height:
-				climb_height = player_height
-				is_climbing = false
-		if Input.is_key_pressed(KEY_A):
-			var angle = CLIMB_SPEED * delta
-			var offset = position - climb_pos
-			offset.y = 0
-			var dist = offset.length()
-			if dist < 0.1:
-				dist = 1.0
-			var current_angle = atan2(offset.z, offset.x)
-			current_angle += angle
-			position.x = climb_pos.x + cos(current_angle) * dist
-			position.z = climb_pos.z + sin(current_angle) * dist
-			rotation.y += angle
-		if Input.is_key_pressed(KEY_D):
-			var angle = -CLIMB_SPEED * delta
-			var offset = position - climb_pos
-			offset.y = 0
-			var dist = offset.length()
-			if dist < 0.1:
-				dist = 1.0
-			var current_angle = atan2(offset.z, offset.x)
-			current_angle += angle
-			position.x = climb_pos.x + cos(current_angle) * dist
-			position.z = climb_pos.z + sin(current_angle) * dist
-			rotation.y += angle
+			if climb_height < min_climb_y:
+				if min_climb_y <= player_height + 0.3:
+					climb_height = player_height
+					is_climbing = false
+				else:
+					climb_height = min_climb_y
+					
+		# Fetch the 3D center of the trunk/branch at current height
+		var trunk_center = get_trunk_center_at_height(climb_target, climb_height)
+		
+		# Orbit rotation & horizontal tracking relative to the dynamic trunk center
+		var to_player = position - trunk_center
+		to_player.y = 0
+		
+		# Lock distance from the trunk center to exactly 0.8 meters at all times
+		var current_dist = 0.8
+			
+		var current_angle = atan2(to_player.z, to_player.x)
+		
+		var orbit_input = 0.0
+		if Input.is_key_pressed(KEY_A) or Input.is_key_pressed(KEY_LEFT):
+			orbit_input += 1.0
+		if Input.is_key_pressed(KEY_D) or Input.is_key_pressed(KEY_RIGHT):
+			orbit_input -= 1.0
+			
+		if orbit_input != 0.0:
+			current_angle += orbit_input * CLIMB_SPEED * delta
+			
+		# Shifting dynamically to follow the curved trunk center
+		position.x = trunk_center.x + cos(current_angle) * current_dist
+		position.z = trunk_center.z + sin(current_angle) * current_dist
 		position.y = climb_height
+		
+		# Keep player facing the trunk horizontally, preserving mouse look pitch and right-click yaw offsets
+		var dir_to_trunk = (trunk_center - position).normalized()
+		var trunk_angle = atan2(-dir_to_trunk.x, -dir_to_trunk.z)
+		
+		if is_orbiting:
+			# If holding right-click and looking around, let the mouse guide rotation and update look offset
+			climb_look_offset = rotation.y - trunk_angle
+		else:
+			# Otherwise, dynamically align rotation to face the trunk with the custom look offset maintained
+			rotation.y = trunk_angle + climb_look_offset
+		
 		velocity = Vector3.ZERO
 		return
 
@@ -918,11 +979,38 @@ func _process(delta: float) -> void:
 	if on_ground and Input.is_key_pressed(KEY_SPACE):
 		velocity.y = jump_speed
 
-	var t_move = velocity * delta
-	t_move.y = velocity.y * delta
+	position += velocity * delta
 
-	if t_move.length() > 0:
-		position += t_move.normalized() * move_speed * delta
+
+func get_trunk_center_at_height(target: Node3D, height_y: float) -> Vector3:
+	if not is_instance_valid(target) or not target.has_meta("path"):
+		return target.global_position
+		
+	var local_path = target.get_meta("path")
+	if local_path.size() < 2:
+		return target.global_position
+		
+	var global_points = []
+	for p in local_path:
+		global_points.append(target.to_global(p))
+		
+	if height_y <= global_points[0].y:
+		return global_points[0]
+		
+	if height_y >= global_points[-1].y:
+		return global_points[-1]
+		
+	for i in range(global_points.size() - 1):
+		var p1 = global_points[i]
+		var p2 = global_points[i + 1]
+		if (p1.y <= height_y and p2.y >= height_y) or (p1.y >= height_y and p2.y <= height_y):
+			var dy = p2.y - p1.y
+			if abs(dy) < 0.001:
+				return p1
+			var t = (height_y - p1.y) / dy
+			return p1.lerp(p2, t)
+			
+	return target.global_position
 
 
 func _toggle_climbing() -> void:
@@ -944,12 +1032,15 @@ func _toggle_climbing() -> void:
 			is_climbing = true
 			climb_target = hit
 			climb_height = position.y
-			var to_trunk = hit.global_position - position
+			climb_look_offset = 0.0
+			
+			# Target framing: attach player 0.8m away from trunk center at current height
+			var trunk_center = get_trunk_center_at_height(hit, position.y)
+			var to_trunk = trunk_center - position
 			to_trunk.y = 0
-			if to_trunk.length() > 0.5:
-				var dir = to_trunk.normalized()
-				position.x = hit.global_position.x - dir.x * 0.8
-				position.z = hit.global_position.z - dir.z * 0.8
+			var dir = to_trunk.normalized()
+			position.x = trunk_center.x - dir.x * 0.8
+			position.z = trunk_center.z - dir.z * 0.8
 
 
 func _toggle_tool_active() -> void:

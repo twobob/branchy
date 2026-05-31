@@ -38,6 +38,7 @@ script = ExtResource("2_cmra1")
 
 [node name="TreeGenerator3D" type="Node3D" parent="." unique_id=67577384]
 script = ExtResource("1_a2b3c")
+rule_X = "F-[[X]+X]+F[+FX]-X"
 seed = 30
 
 [node name="GameController" type="Node3D" parent="." unique_id=1404222453]

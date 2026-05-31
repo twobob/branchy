@@ -260,23 +260,19 @@ func _initialize_level_branches() -> void:
 	
 	var index = 0
 	for b in tree_generator.branches:
-		var anchor: StaticBody3D = b.anchor
-		var tip: RigidBody3D = b.tip
-		
-		if not is_instance_valid(tip) or not is_instance_valid(anchor):
+		var body = b.get("body")
+		if not body or not is_instance_valid(body):
 			continue
 			
 
 
-		tip.collision_layer = 2
-
-		anchor.collision_layer = 2
+		body.collision_layer = 2
 		
 
-		tip.set_meta("is_branch_tip", true)
-		tip.set_meta("branch_ref", b)
+		body.set_meta("is_branch_tip", true)
+		body.set_meta("branch_ref", b)
 		
-		var tip_pos = tip.global_position
+		var tip_pos = body.global_position
 		var inside = is_point_inside_hologram(tip_pos)
 		
 		var deadwood = false
@@ -288,15 +284,15 @@ func _initialize_level_branches() -> void:
 				deadwood = true
 				total_deadwood += 1
 				
-		tip.set_meta("is_deadwood", deadwood)
-		tip.set_meta("was_cut", false)
+		body.set_meta("is_deadwood", deadwood)
+		body.set_meta("was_cut", false)
 		
 
 		if deadwood:
 			var dead_mat = StandardMaterial3D.new()
 			dead_mat.albedo_color = Color(0.4, 0.28, 0.2)
 			dead_mat.roughness = 0.95
-			for child in tip.get_children():
+			for child in body.get_children():
 				if child is MeshInstance3D:
 					child.material_override = dead_mat
 					
@@ -337,7 +333,7 @@ func calculate_accuracy() -> float:
 	
 	for state in original_branch_states:
 		var ref = state.ref
-		var tip = ref.tip
+		var tip = ref.get("body")
 		var originally_inside = state.is_inside
 		
 		var is_cut = true
@@ -359,6 +355,7 @@ func calculate_accuracy() -> float:
 	return clamp(acc, 0.0, 100.0)
 
 func _handle_mouse_action() -> void:
+	print("[GC] _handle_mouse_action called, tool=", active_tool)
 	if level_completed:
 		return
 		
@@ -405,7 +402,10 @@ func _handle_mouse_action() -> void:
 		var result = space_state.intersect_ray(query)
 		if result:
 			var hit_body = result.collider
-			if hit_body is RigidBody3D and hit_body.get_meta("is_branch_tip", false):
+			var ray_dist = camera.global_position.distance_to(result.position)
+			if ray_dist > 2.5:
+				continue
+			if (hit_body is RigidBody3D or hit_body is StaticBody3D) and hit_body.get_meta("is_branch_tip", false):
 				if active_tool == "Vacuum":
 					_vacuum_branch(hit_body)
 					break
@@ -413,51 +413,30 @@ func _handle_mouse_action() -> void:
 					if not hit_body.get_meta("was_cut", false):
 						_cut_branch_physically(hit_body)
 
-func _cut_branch_physically(tip: RigidBody3D) -> void:
-	if not is_instance_valid(tip):
+func _cut_branch_physically(hit_body: CollisionObject3D) -> void:
+	if not is_instance_valid(hit_body):
 		return
-		
-	tip.set_meta("was_cut", true)
 	
-
-	var parent = tip.get_parent()
-	if is_instance_valid(parent):
-		for child in parent.get_children():
-			if child is Joint3D:
-				child.queue_free()
-				
-
-	tip.gravity_scale = 1.0
-	tip.collision_layer = 1
-	tip.collision_mask = 1
+	hit_body.set_meta("was_cut", true)
 	
-
-	var push_dir = (tip.global_position - global_position).normalized()
-	if push_dir.length() < 0.1:
-		push_dir = Vector3.UP
+	# Delegate cutting to TreeGenerator3D
+	if tree_generator:
+		tree_generator.sever_branch(hit_body, hit_body.global_position, Vector3.UP)
 	
-	var multiplier = 2.5 if active_tool == "Chainsaw" else 1.0
-	tip.apply_impulse((push_dir * 1.5 + Vector3(
-		tree_generator.rng.randf_range(-0.5, 0.5),
-		tree_generator.rng.randf_range(-0.2, 0.5),
-		tree_generator.rng.randf_range(-0.5, 0.5)
-	)) * multiplier)
-	
-
-	var is_deadwood = tip.get_meta("is_deadwood", false)
-	cut_branches[tip.get_instance_id()] = true
+	var is_deadwood = hit_body.get_meta("is_deadwood", false)
+	cut_branches[hit_body.get_instance_id()] = true
 	
 	if current_mode == Mode.DEADWOOD:
 		if is_deadwood:
 			pruned_deadwood += 1
 			score += 100
 			play_procedural_sound("victory")
-			spawn_particles(tip.global_position, Color(0.45, 0.35, 0.25))
+			spawn_particles(hit_body.global_position, Color(0.45, 0.35, 0.25))
 		else:
 			healthy_cut += 1
 			score -= 50
 			play_procedural_sound("penalty")
-			spawn_particles(tip.global_position, Color(0.2, 0.75, 0.2))
+			spawn_particles(hit_body.global_position, Color(0.2, 0.75, 0.2))
 	else:
 
 		score += 20
@@ -465,7 +444,7 @@ func _cut_branch_physically(tip: RigidBody3D) -> void:
 		var leaf_color = Color(0.25, 0.65, 0.25)
 		if is_deadwood:
 			leaf_color = Color(0.4, 0.3, 0.2)
-		spawn_particles(tip.global_position, leaf_color)
+		spawn_particles(hit_body.global_position, leaf_color)
 		
 	update_hud()
 	
@@ -477,12 +456,13 @@ func _cut_branch_physically(tip: RigidBody3D) -> void:
 	if current_mode == Mode.DEADWOOD:
 		check_victory_condition()
 
-func _vacuum_branch(tip: RigidBody3D) -> void:
+func _vacuum_branch(tip: CollisionObject3D) -> void:
 	if not is_instance_valid(tip) or tip.get_meta("is_vacuuming", false):
 		return
 		
 	tip.set_meta("is_vacuuming", true)
-	tip.freeze = true
+	if tip is RigidBody3D:
+		tip.freeze = true
 	
 	play_procedural_sound("cut")
 	
@@ -512,7 +492,7 @@ func _on_hopper_body_entered(body: Node3D) -> void:
 
 		_shred_branch_event(tip)
 
-func _shred_branch_event(tip: RigidBody3D) -> void:
+func _shred_branch_event(tip: Node3D) -> void:
 	if not is_instance_valid(tip):
 		return
 		

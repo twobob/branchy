@@ -19,10 +19,10 @@ var saw_timer := 0.0
 
 
 var grinding_branches: Dictionary = {}
-var chipper_center := Vector3(4.0, 1.2, 2.0)
+var chipper_center := Vector3(5.0, 1.2, 3.0)
 var mesh_slicer: MeshSlicer
 var active_cut_joint: CutJoint
-var cut_target: RigidBody3D
+var cut_target: CollisionObject3D
 var cut_progress: float = 0.0
 var is_cutting: bool = false
 var wood_grain_mat: StandardMaterial3D
@@ -127,7 +127,7 @@ func setup_wood_chipper():
 	
 	var col = CollisionShape3D.new()
 	var box = BoxShape3D.new()
-	box.size = Vector3(1.5, 1.5, 1.5)
+	box.size = Vector3(2.5, 2.5, 2.5)
 	col.shape = box
 	area.add_child(col)
 	
@@ -297,14 +297,18 @@ func _process(delta: float):
 		var center = vp.get_visible_rect().size * 0.5
 		var origin = camera.project_ray_origin(center)
 		var normal = camera.project_ray_normal(center)
-		var end = origin + normal * 1.5
+		var end = origin + normal * 100.0
 		var space_state = get_world_3d().direct_space_state
 		var query = PhysicsRayQueryParameters3D.create(origin, end)
 		query.collision_mask = 2
 		var result = space_state.intersect_ray(query)
 		if result:
-			laser_dot.global_position = result.position
-			laser_dot.visible = true
+			var dist = camera.global_position.distance_to(result.position)
+			if dist <= 2.0:
+				laser_dot.global_position = result.position
+				laser_dot.visible = true
+			else:
+				laser_dot.visible = false
 		else:
 			laser_dot.visible = false
 
@@ -320,7 +324,7 @@ func _process(delta: float):
 
 			var vp_center = get_viewport().get_visible_rect().size * 0.5
 			var cut_origin = camera.project_ray_origin(vp_center)
-			var cut_end = cut_origin + camera.project_ray_normal(vp_center) * 1.5
+			var cut_end = cut_origin + camera.project_ray_normal(vp_center) * 100.0
 
 			var space_state = get_world_3d().direct_space_state
 			var query = PhysicsRayQueryParameters3D.create(cut_origin, cut_end)
@@ -328,8 +332,15 @@ func _process(delta: float):
 
 			var result = space_state.intersect_ray(query)
 			if result:
+				var hit_dist = camera.global_position.distance_to(result.position)
+				print("CUT RAY HIT: dist=", snappedf(hit_dist, 0.01), " cam=", camera.global_position, " hit=", result.position, " collider=", result.collider.name)
+				if hit_dist > 2.0:
+					if is_cutting:
+						is_cutting = false
+						cut_target = null
+						cut_progress = 0.0
 				var hit_collider = result.collider
-				if (hit_collider is RigidBody3D or hit_collider is StaticBody3D) and tree_gen:
+				if hit_dist <= 2.0 and (hit_collider is RigidBody3D or hit_collider is StaticBody3D) and tree_gen:
 					var hit_pos = result.position
 					var hit_normal = result.normal
 

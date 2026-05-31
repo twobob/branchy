@@ -4,7 +4,7 @@ class_name TreeGenerator3D
 signal branch_pruned(branch_index: int)
 
 @export var axiom: String = "X"
-@export var rule_X: String = "F[+X]F[-X]+X"
+@export var rule_X: String = "F-[[X]+X]+F[+FX]-X"
 @export var rule_F: String = "FF"
 @export var iterations: int = 4
 
@@ -36,9 +36,9 @@ var debug_meshes: Array = []
 var show_debug: bool = false
 var time_accum := 0.0
 
-var tree_material: StandardMaterial3D
+var tree_material: Material
 var debug_material: StandardMaterial3D
-var diseased_materials: Array[StandardMaterial3D] = []
+var diseased_materials: Array[Material] = []
 var wind_noise: FastNoiseLite
 
 func expand() -> String:
@@ -128,9 +128,13 @@ func _generate_random_rule() -> String:
 	return "".join(parts)
 
 func _ready():
-	tree_material = StandardMaterial3D.new()
-	tree_material.albedo_color = Color(0.35, 0.22, 0.12)
-	tree_material.roughness = 0.9
+	tree_material = ShaderMaterial.new()
+	var wind_shader = Shader.new()
+	wind_shader.code = _get_wind_shader_code()
+	tree_material.shader = wind_shader
+	tree_material.set_shader_parameter("albedo_color", Color(0.35, 0.22, 0.12))
+	tree_material.set_shader_parameter("wind_strength", wind_strength)
+	tree_material.set_shader_parameter("wind_speed", wind_speed)
 	
 	debug_material = StandardMaterial3D.new()
 	debug_material.albedo_color = Color(0.0, 1.0, 1.0, 0.3)
@@ -143,9 +147,13 @@ func _ready():
 		Color(0.65, 0.1, 0.15)
 	]
 	for c in colors:
-		var mat = StandardMaterial3D.new()
-		mat.albedo_color = c
-		mat.roughness = 0.9
+		var mat = ShaderMaterial.new()
+		var dshader = Shader.new()
+		dshader.code = _get_wind_shader_code()
+		mat.shader = dshader
+		mat.set_shader_parameter("albedo_color", c)
+		mat.set_shader_parameter("wind_strength", wind_strength)
+		mat.set_shader_parameter("wind_speed", wind_speed)
 		diseased_materials.append(mat)
 		
 	wind_noise = FastNoiseLite.new()
@@ -266,7 +274,7 @@ func estimate_height(cmd: String) -> float:
 	return max(max_y, 0.001)
 
 func should_spawn_branch(h: float) -> bool:
-	if branches.size() >= 80:
+	if branches.size() >= 200:
 		return false
 	if h < base_branch_offset:
 		return false
@@ -279,6 +287,8 @@ func create_static_branch(path: Array, thicknesses: Array):
 	body.collision_mask = 0
 	add_child(body)
 	body.name = "Trunk"
+	body.set_meta("path", path)
+	body.set_meta("thicknesses", thicknesses)
 
 	var mesh_node = MeshInstance3D.new()
 	body.add_child(mesh_node)
@@ -305,8 +315,9 @@ func create_static_branch(path: Array, thicknesses: Array):
 			col.basis = Basis(right, up, fwd)
 		body.add_child(col)
 
-func create_branch(origin: Vector3, trunk_dir: Vector3, height_ratio: float, dynamic: bool, parent_index: int) -> int:
+func create_branch(origin: Vector3, trunk_dir: Vector3, height_ratio: float, _from_trunk: bool = false, parent_index: int = -1) -> int:
 	var branch_idx = branches.size()
+
 	var branch_root = Node3D.new()
 	add_child(branch_root)
 	branch_root.name = "BranchRoot_%d" % branch_idx
@@ -323,112 +334,95 @@ func create_branch(origin: Vector3, trunk_dir: Vector3, height_ratio: float, dyn
 	var total_length = segment_length * 5.0 * length_scale
 	var thick = branch_thickness * 0.6 * length_scale
 
-	var num_segs = 3
-	var seg_len = total_length / num_segs
-
 	var health = "healthy"
 	var mat = tree_material
 	if rng.randf() < dead_branch_ratio:
 		health = "diseased"
 		mat = diseased_materials[rng.randi() % diseased_materials.size()]
 
-	var anchor = StaticBody3D.new()
-	branch_root.add_child(anchor)
-	anchor.name = "Anchor"
-	var anchor_col = CollisionShape3D.new()
-	var anchor_sphere = SphereShape3D.new()
-	anchor_sphere.radius = thick * 0.5
-	anchor_col.shape = anchor_sphere
-	anchor.add_child(anchor_col)
+	# Build a multi-point path for the branch (curved, not segmented)
+	var num_points = 8
+	var path = []
+	var thicknesses = []
+	var cur_dir = dir
+	var cur_pos = Vector3.ZERO
+	for i in range(num_points):
+		path.append(cur_pos)
+		var t_along = float(i) / (num_points - 1)
+		thicknesses.append(lerp(thick, thickness_taper, t_along))
+		# Slight random curve
+		var bend = Vector3(rng.randf_range(-0.05, 0.05), rng.randf_range(-0.02, 0.02), rng.randf_range(-0.05, 0.05))
+		cur_dir = (cur_dir + bend).normalized()
+		# Gravity droop increases along branch
+		cur_dir.y -= 0.02 * t_along
+		cur_dir = cur_dir.normalized()
+		cur_pos += cur_dir * (total_length / (num_points - 1))
 
-	var segments = []
-	var joints = []
-	var prev_node_path_prefix = "../Anchor"
-	if parent_index >= 0 and parent_index < branches.size():
-		prev_node_path_prefix = "../../BranchRoot_%d/Tip" % parent_index
+	# Single StaticBody3D for the whole branch
+	var body = StaticBody3D.new()
+	body.collision_layer = 2
+	body.collision_mask = 0
+	branch_root.add_child(body)
+	body.name = "BranchBody"
 
-	for seg_i in range(num_segs):
-		var t = float(seg_i + 1) / num_segs
-		var seg_thick = lerp(thick, thickness_taper, t)
-		var seg_name = "Seg%d" % seg_i
+	# Single continuous mesh
+	var mesh_node = MeshInstance3D.new()
+	body.add_child(mesh_node)
+	mesh_node.material_override = mat
+	var branch_mesh = generate_tube_array(path, thicknesses) if path.size() > 2 else generate_tube(path, thick, thickness_taper)
+	mesh_node.mesh = branch_mesh
 
-		var body = RigidBody3D.new()
-		branch_root.add_child(body)
-		body.name = seg_name
-		body.collision_layer = 2
-		body.collision_mask = 0
-		body.mass = seg_len * 0.3
-		body.gravity_scale = 0.0
-		body.position = dir * seg_len * (seg_i + 1)
-		body.linear_damp = 0.5
-		body.angular_damp = 0.8
-		body.can_sleep = false
-
+	# Collision shapes along the branch
+	for i in range(path.size() - 1):
 		var col = CollisionShape3D.new()
 		var cap = CapsuleShape3D.new()
+		var seg_dir_v = (path[i + 1] - path[i])
+		var seg_len = seg_dir_v.length()
+		var seg_thick = thicknesses[i] if i < thicknesses.size() else 0.05
 		cap.radius = max(seg_thick, 0.02)
-		cap.height = seg_len + (seg_thick * 2.0)
+		cap.height = max(seg_len, 0.05)
 		col.shape = cap
-		col.position = -dir * (seg_len * 0.5)
-		var up = Vector3.UP
-		if abs(dir.dot(up)) > 0.99: up = Vector3.RIGHT
-		var x_ax = dir.cross(up).normalized()
-		var z_ax = x_ax.cross(dir).normalized()
-		col.basis = Basis(x_ax, dir, z_ax)
+		var mid = (path[i] + path[i + 1]) * 0.5
+		col.position = mid
+		var up_dir = seg_dir_v.normalized()
+		if up_dir.length() > 0.001:
+			var right = up_dir.cross(Vector3.RIGHT).normalized()
+			if right.length() < 0.01:
+				right = up_dir.cross(Vector3.FORWARD).normalized()
+			var fwd = right.cross(up_dir).normalized()
+			col.basis = Basis(right, up_dir, fwd)
 		body.add_child(col)
 
-		var vis = MeshInstance3D.new()
-		vis.material_override = mat
-		var seg_path = [-dir * seg_len, Vector3.ZERO]
-		var prev_thick = lerp(thick, thickness_taper, float(seg_i) / num_segs)
-		var m = generate_tube(seg_path, prev_thick, seg_thick)
-		if m:
-			vis.mesh = m
-		body.add_child(vis)
+	# Store metadata on the body
+	body.set_meta("is_branch_tip", true)
+	body.set_meta("is_deadwood", health == "diseased")
+	body.set_meta("branch_idx", branch_idx)
+	body.set_meta("path", path)
+	body.set_meta("thicknesses", thicknesses)
 
-		body.set_meta("is_branch_tip", true)
-		body.set_meta("is_deadwood", health == "diseased")
-		body.set_meta("branch_idx", branch_idx)
-		body.set_meta("seg_idx", seg_i)
-
-		var jt = Generic6DOFJoint3D.new()
-		branch_root.add_child(jt)
-		jt.name = "Joint%d" % seg_i
-		if seg_i == 0:
-			jt.node_a = NodePath(prev_node_path_prefix)
-		else:
-			jt.node_a = NodePath("../Seg%d" % (seg_i - 1))
-		jt.node_b = NodePath("../%s" % seg_name)
-
-		var seg_stiff = stiffness * (1.0 - t * 0.5)
-		var seg_damp = damping * (1.0 - t * 0.3)
-		for ax in ["x", "y", "z"]:
-			jt.set("linear_limit_%s_enabled" % ax, true)
-			jt.set("linear_limit_%s_lower" % ax, 0.0)
-			jt.set("linear_limit_%s_upper" % ax, 0.0)
-			jt.set("angular_spring_%s_enabled" % ax, true)
-			jt.set("angular_spring_%s_stiffness" % ax, seg_stiff)
-			jt.set("angular_spring_%s_damping" % ax, seg_damp)
-
-		segments.append(body)
-		joints.append(jt)
-
+	# Store branch data
 	branches.append({
-		"anchor": anchor,
-		"tip": segments[-1],
-		"joint": joints[0],
-		"segments": segments,
-		"joints": joints,
+		"root": branch_root,
+		"body": body,
+		"mesh_node": mesh_node,
+		"path": path,
+		"thicknesses": thicknesses,
+		"material": mat,
 		"parent_index": parent_index,
 		"children": [],
 		"severed": false,
-		"health": health
+		"health": health,
+		"segments": [],
+		"joints": [],
+		"joint": null,
+		"anchor": null
 	})
 
-	if parent_index >= 0 and parent_index < branches.size() - 1:
-		branches[parent_index].children.append(branch_idx)
+	if parent_index >= 0 and parent_index < branches.size():
+		branches[parent_index]["children"].append(branch_idx)
 
 	return branch_idx
+
 
 func prune_branch(branch_index: int):
 	if branch_index < 0 or branch_index >= branches.size():
@@ -438,50 +432,71 @@ func prune_branch(branch_index: int):
 		return
 	b.severed = true
 
+	# Cascade to children first
 	for child_idx in b.get("children", []):
 		prune_branch(child_idx)
 
-	var segs = b.get("segments", [])
-	var jts = b.get("joints", [])
+	# Convert the static branch to a falling rigid body
+	var body = b.get("body")
+	var mesh_node = b.get("mesh_node")
+	var root = b.get("root")
 
-	for jt in jts:
-		if is_instance_valid(jt):
-			jt.queue_free()
-	if is_instance_valid(b.joint) and b.joint not in jts:
-		b.joint.queue_free()
+	if body and is_instance_valid(body) and mesh_node and is_instance_valid(mesh_node):
+		# Create a RigidBody3D replacement
+		var rb = RigidBody3D.new()
+		rb.name = "FallingBranch_%d" % branch_index
+		rb.mass = 1.0
+		rb.gravity_scale = 1.0
+		rb.collision_layer = 8
+		rb.collision_mask = 1 | 8
+		rb.linear_damp = 0.5
+		rb.angular_damp = 0.8
 
-	var anchor = b.get("anchor")
-	if anchor and is_instance_valid(anchor):
-		anchor.queue_free()
+		# Copy the mesh
+		var new_mesh = MeshInstance3D.new()
+		new_mesh.mesh = mesh_node.mesh
+		new_mesh.material_override = b.get("material", tree_material)
+		rb.add_child(new_mesh)
 
-	for seg in segs:
-		if is_instance_valid(seg):
-			seg.freeze = false
-			seg.gravity_scale = 1.0
-			seg.collision_layer = 8
-			seg.collision_mask = 1 | 8
-			seg.linear_damp = 0.2
-			seg.angular_damp = 0.3
+		# Add a simple collision
+		var col = CollisionShape3D.new()
+		var box = BoxShape3D.new()
+		if mesh_node.mesh:
+			var aabb = mesh_node.mesh.get_aabb()
+			box.size = aabb.size.clamp(Vector3(0.05, 0.05, 0.05), Vector3(3, 3, 3))
+			col.position = aabb.get_center()
+		else:
+			box.size = Vector3(0.2, 0.5, 0.2)
+		col.shape = box
+		rb.add_child(col)
 
-	if segs.size() > 0 and is_instance_valid(segs[0]) and segs[0].is_inside_tree():
-		var tip_pos = segs[0].global_position
-		var self_pos = global_position if is_inside_tree() else Vector3.ZERO
-		var trunk_dir_out = (tip_pos - self_pos).normalized()
-		trunk_dir_out.y = 0.2
-		var push_dir = (trunk_dir_out + Vector3(rng.randf_range(-0.3, 0.3), 0.1, rng.randf_range(-0.3, 0.3))).normalized()
-		segs[0].apply_central_impulse(push_dir * segs[0].mass * 2.0)
+		# Position at the branch's world position
+		if body.is_inside_tree():
+			rb.global_position = body.global_position
+			rb.global_rotation = body.global_rotation
+		else:
+			rb.position = body.position
+			rb.rotation = body.rotation
+		get_parent().add_child(rb)
 
-	for seg in segs:
-		if is_instance_valid(seg):
-			seg.contact_monitor = true
-			seg.max_contacts_reported = 2
-			var s = seg
-			seg.body_entered.connect(func(body):
-				if not is_instance_valid(s) or s.is_queued_for_deletion():
-					return
-				if body.name == "GroundPlane" or body.collision_layer == 1:
-					_start_fade_out(s)
-			)
+		# Remove the original static branch
+		if root and is_instance_valid(root):
+			root.queue_free()
+
+		# Fade out after hitting ground
+		rb.contact_monitor = true
+		rb.max_contacts_reported = 1
+		rb.body_entered.connect(func(other_body):
+			if not is_instance_valid(rb) or rb.is_queued_for_deletion():
+				return
+			if other_body.collision_layer == 1:
+				_start_fade_out(rb)
+		)
+
+		# Cleanup after 15 seconds regardless
+		var tw = rb.create_tween()
+		tw.tween_interval(15.0)
+		tw.tween_callback(rb.queue_free)
 
 	branch_pruned.emit(branch_index)
 
@@ -500,179 +515,44 @@ func _start_fade_out(tip: RigidBody3D):
 			break
 			
 	if visual and visual.material_override:
-		var mat: StandardMaterial3D = visual.material_override.duplicate()
+		var mat = visual.material_override.duplicate()
 		visual.material_override = mat
-		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 		
-		var tween = tip.create_tween()
-		tween.tween_property(mat, "albedo_color:a", 0.0, 1.5)
-		tween.tween_callback(tip.queue_free)
+		if mat is ShaderMaterial:
+			var current_color = mat.get_shader_parameter("albedo_color")
+			if current_color == null:
+				current_color = Color(0.35, 0.22, 0.12, 1.0)
+			
+			var tween = tip.create_tween()
+			tween.tween_method(
+				func(alpha: float):
+					var new_col = current_color
+					new_col.a = alpha
+					mat.set_shader_parameter("albedo_color", new_col),
+				current_color.a,
+				0.0,
+				1.5
+			)
+			tween.tween_callback(tip.queue_free)
+		elif mat is StandardMaterial3D:
+			mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+			var tween = tip.create_tween()
+			tween.tween_property(mat, "albedo_color:a", 0.0, 1.5)
+			tween.tween_callback(tip.queue_free)
+		else:
+			var tween = tip.create_tween()
+			tween.tween_interval(1.5)
+			tween.tween_callback(tip.queue_free)
 	else:
 		var tween = tip.create_tween()
 		tween.tween_interval(1.5)
 		tween.tween_callback(tip.queue_free)
 
 
-func sever_branch(hit_collider: Node, hit_pos: Vector3, hit_normal: Vector3):
-	# Works on ANY collider - trunk StaticBody3D or branch RigidBody3D
-	var mesh_slicer = get_node_or_null("MeshSlicer")
-	if not mesh_slicer:
-		mesh_slicer = MeshSlicer.new()
-		mesh_slicer.name = "MeshSlicer"
-		add_child(mesh_slicer)
-
-	# Find the MeshInstance3D on the hit collider
-	var hit_mesh_inst: MeshInstance3D = null
-	for child in hit_collider.get_children():
-		if child is MeshInstance3D:
-			hit_mesh_inst = child
-			break
-
-	if hit_mesh_inst == null or hit_mesh_inst.mesh == null:
-		# No mesh to cut - just use joint-based fallback
-		_fallback_sever(hit_collider, hit_pos, hit_normal)
-		return
-
-	# Build a cut plane at hit_pos perpendicular to the branch direction
-	var cut_plane_normal = hit_normal
-	# For branches, cut perpendicular to the branch direction
-	if hit_collider is RigidBody3D and hit_collider.has_meta("branch_idx"):
-		var branch_idx = hit_collider.get_meta("branch_idx")
-		if branch_idx >= 0 and branch_idx < branches.size():
-			var b = branches[branch_idx]
-			var segs = b.get("segments", [])
-			var seg_idx = hit_collider.get_meta("seg_idx") if hit_collider.has_meta("seg_idx") else 0
-			# Get branch direction from segment positions
-			if segs.size() > 1 and seg_idx < segs.size():
-				var prev_pos = segs[max(0, seg_idx - 1)].global_position if is_instance_valid(segs[max(0, seg_idx - 1)]) else hit_collider.global_position
-				var this_pos = hit_collider.global_position
-				cut_plane_normal = (this_pos - prev_pos).normalized()
-				if cut_plane_normal.length() < 0.01:
-					cut_plane_normal = Vector3.UP
-	elif hit_collider.name == "Trunk":
-		cut_plane_normal = Vector3.UP
-
-	# Create the slice transform: a thin box at the cut position
-	var slice_xform = Transform3D()
-	var up = cut_plane_normal
-	var right = up.cross(Vector3.FORWARD).normalized()
-	if right.length() < 0.01:
-		right = up.cross(Vector3.RIGHT).normalized()
-	var fwd = right.cross(up).normalized()
-	slice_xform.basis = Basis(right, up, fwd)
-	# Position relative to mesh instance
-	var local_hit = hit_mesh_inst.to_local(hit_pos)
-	slice_xform.origin = local_hit
-
-	# Perform the CSG slice
-	var result_meshes = mesh_slicer.slice_mesh(slice_xform, hit_mesh_inst.mesh, tree_material)
-	var mesh_a = result_meshes[0]  # Part connected to root
-	var mesh_b = result_meshes[1]  # Part that falls
-
-	if mesh_a == null or mesh_b == null or mesh_a.get_surface_count() == 0 or mesh_b.get_surface_count() == 0:
-		# CSG slice failed - use fallback
-		_fallback_sever(hit_collider, hit_pos, hit_normal)
-		return
-
-	# Replace original mesh with part A (stays)
-	hit_mesh_inst.mesh = mesh_a
-
-	# Create a new RigidBody3D for part B (falls)
-	var falling_piece = RigidBody3D.new()
-	falling_piece.name = "CutPiece_%d" % randi()
-	falling_piece.mass = 2.0
-	falling_piece.gravity_scale = 1.0
-	falling_piece.collision_layer = 8
-	falling_piece.collision_mask = 1 | 8
-	falling_piece.linear_damp = 0.3
-	falling_piece.angular_damp = 0.5
-
-	var piece_vis = MeshInstance3D.new()
-	piece_vis.mesh = mesh_b
-	piece_vis.material_override = tree_material
-	falling_piece.add_child(piece_vis)
-
-	# Add collision to the falling piece
-	var col = CollisionShape3D.new()
-	var box = BoxShape3D.new()
-	var aabb = mesh_b.get_aabb()
-	box.size = aabb.size.clamp(Vector3(0.05, 0.05, 0.05), Vector3(5, 5, 5))
-	col.shape = box
-	col.position = aabb.get_center()
-	falling_piece.add_child(col)
-
-	# Position the falling piece at the original mesh's world position
-	falling_piece.global_position = hit_mesh_inst.global_position
-	falling_piece.global_rotation = hit_mesh_inst.global_rotation
-	get_parent().add_child(falling_piece)
-
-	# Push it away from the cut
-	var push_dir = -cut_plane_normal
-	push_dir.y = max(push_dir.y, 0.2)
-	falling_piece.apply_central_impulse(push_dir * falling_piece.mass * 3.0)
-	falling_piece.apply_torque_impulse(Vector3(randf_range(-1,1), randf_range(-1,1), randf_range(-1,1)) * 2.0)
-
-	# Now handle branch connectivity - everything above the cut falls
-	if hit_collider.has_meta("branch_idx"):
-		var branch_idx = hit_collider.get_meta("branch_idx")
-		var seg_idx = hit_collider.get_meta("seg_idx") if hit_collider.has_meta("seg_idx") else 0
-		if branch_idx >= 0 and branch_idx < branches.size():
-			var b = branches[branch_idx]
-			var segs = b.get("segments", [])
-			var jts = b.get("joints", [])
-			# Free the joint at the cut point
-			if seg_idx < jts.size() and is_instance_valid(jts[seg_idx]):
-				jts[seg_idx].queue_free()
-			# All segments AFTER the cut point fall with gravity
-			for i in range(seg_idx + 1, segs.size()):
-				var seg = segs[i]
-				if is_instance_valid(seg):
-					_release_segment(seg)
-			# All child branches fall too
-			for child_idx in b.get("children", []):
-				prune_branch(child_idx)
-
-	elif hit_collider.name == "Trunk":
-		# Trunk was cut - everything above the cut height falls
-		var cut_y = hit_pos.y
-		for i in range(branches.size()):
-			var b = branches[i]
-			if b.severed:
-				continue
-			var anchor = b.get("anchor")
-			if anchor and is_instance_valid(anchor):
-				if anchor.global_position.y >= cut_y - 0.3:
-					prune_branch(i)
-
-	# Auto-cleanup falling piece after 10 seconds
-	var tw = falling_piece.create_tween()
-	tw.tween_interval(8.0)
-	tw.tween_callback(falling_piece.queue_free)
-
-
-func _release_segment(seg: RigidBody3D) -> void:
-	seg.freeze = false
-	seg.gravity_scale = 1.0
-	seg.collision_layer = 8
-	seg.collision_mask = 1 | 8
-	seg.linear_damp = 0.3
-	seg.angular_damp = 0.5
-	seg.can_sleep = true
-	seg.apply_central_impulse(Vector3(randf_range(-0.5, 0.5), 0.2, randf_range(-0.5, 0.5)) * seg.mass)
-
-
-func _fallback_sever(hit_collider: Node, hit_pos: Vector3, hit_normal: Vector3):
-	# Joint-based fallback for when CSG slicing fails
-	if hit_collider.name == "Trunk":
-		var cut_y = hit_pos.y
-		for i in range(branches.size()):
-			var b = branches[i]
-			if b.severed:
-				continue
-			var anchor = b.get("anchor")
-			if anchor and is_instance_valid(anchor):
-				if anchor.global_position.y >= cut_y - 0.3:
-					prune_branch(i)
+func sever_branch(hit_collider: Node, hit_pos: Vector3, _hit_normal: Vector3):
+	# Cut at the exact point the tool touches
+	if hit_collider.name == "Trunk" or hit_collider.name.begins_with("Trunk"):
+		_cut_trunk(hit_pos)
 		return
 
 	if not hit_collider.has_meta("branch_idx"):
@@ -683,7 +563,121 @@ func _fallback_sever(hit_collider: Node, hit_pos: Vector3, hit_normal: Vector3):
 	var b = branches[branch_idx]
 	if b.severed:
 		return
-	prune_branch(branch_idx)
+
+	var mesh_node = b.get("mesh_node")
+	var path = b.get("path", [])
+	var thicknesses = b.get("thicknesses", [])
+
+	if not mesh_node or not is_instance_valid(mesh_node) or path.size() < 2:
+		prune_branch(branch_idx)
+		return
+
+	# Find where along the branch path the cut happened
+	var local_hit = hit_collider.to_local(hit_pos)
+	var best_seg = 0
+	var best_t = 0.5
+	var best_dist = INF
+
+	for i in range(path.size() - 1):
+		var a = path[i]
+		var seg_b = path[i + 1]
+		var seg_vec = seg_b - a
+		var seg_len = seg_vec.length()
+		if seg_len < 0.001:
+			continue
+		var param = clampf((local_hit - a).dot(seg_vec) / (seg_len * seg_len), 0.0, 1.0)
+		var closest = a + seg_vec * param
+		var d = closest.distance_to(local_hit)
+		if d < best_dist:
+			best_dist = d
+			best_seg = i
+			best_t = param
+
+	# Split point index (which path point to split at)
+	var split_idx = best_seg + 1
+	if split_idx <= 0:
+		split_idx = 1
+	if split_idx >= path.size() - 1:
+		# Cut near the tip - just prune the whole thing
+		prune_branch(branch_idx)
+		return
+
+	# Create stub mesh (lower part stays)
+	var stub_path = path.slice(0, split_idx + 1)
+	var stub_thick = thicknesses.slice(0, split_idx + 1)
+	var stub_mesh = generate_tube_array(stub_path, stub_thick) if stub_path.size() > 2 else generate_tube(stub_path, stub_thick[0], stub_thick[-1])
+	if stub_mesh:
+		mesh_node.mesh = stub_mesh
+
+	# Create falling piece (upper part falls)
+	var fall_path = path.slice(split_idx)
+	var fall_thick = thicknesses.slice(split_idx)
+
+	if fall_path.size() >= 2:
+		var fall_mesh = generate_tube_array(fall_path, fall_thick) if fall_path.size() > 2 else generate_tube(fall_path, fall_thick[0], fall_thick[-1])
+		if fall_mesh:
+			var rb = RigidBody3D.new()
+			rb.name = "CutBranch_%d" % branch_idx
+			rb.mass = 0.5
+			rb.gravity_scale = 1.0
+			rb.collision_layer = 8
+			rb.collision_mask = 1 | 8
+			rb.linear_damp = 0.5
+			rb.angular_damp = 0.8
+
+			var vis = MeshInstance3D.new()
+			vis.mesh = fall_mesh
+			vis.material_override = b.get("material", tree_material)
+			rb.add_child(vis)
+
+			var col = CollisionShape3D.new()
+			var box = BoxShape3D.new()
+			var aabb = fall_mesh.get_aabb()
+			box.size = aabb.size.clamp(Vector3(0.05, 0.05, 0.05), Vector3(3, 3, 3))
+			col.shape = box
+			col.position = aabb.get_center()
+			rb.add_child(col)
+
+			# Position at the cut point world space
+			if hit_collider.is_inside_tree():
+				rb.global_position = hit_collider.to_global(path[split_idx])
+				rb.global_rotation = hit_collider.global_rotation
+			else:
+				rb.position = path[split_idx]
+				rb.rotation = hit_collider.rotation
+			get_parent().add_child(rb)
+
+			# Cleanup
+			var tw = rb.create_tween()
+			tw.tween_interval(12.0)
+			tw.tween_callback(rb.queue_free)
+
+	# Prune child branches
+	for child_idx in b.get("children", []):
+		prune_branch(child_idx)
+
+
+func _cut_trunk(cut_pos: Vector3) -> void:
+	var cut_y = cut_pos.y
+	for i in range(branches.size()):
+		var b = branches[i]
+		if b.severed:
+			continue
+		var anchor = b.get("anchor")
+		if anchor and is_instance_valid(anchor):
+			if anchor.global_position.y >= cut_y - 0.3:
+				prune_branch(i)
+
+
+func _release_segment(seg: RigidBody3D) -> void:
+	# Just enable gravity and collision. No impulse. Gravity does the work.
+	seg.freeze = false
+	seg.gravity_scale = 1.0
+	seg.collision_layer = 8
+	seg.collision_mask = 1 | 8
+	seg.linear_damp = 0.5
+	seg.angular_damp = 0.8
+	seg.can_sleep = true
 
 
 func set_debug_visible(on: bool) -> void:
@@ -715,70 +709,46 @@ func _expand_bounds_recursive(node: Node, bounds: AABB) -> AABB:
 
 func _physics_process(delta):
 	time_accum += delta
-	# Every 60 frames, check for orphaned branches
+	# Check for orphaned branches every 60 frames
 	if Engine.get_physics_frames() % 60 == 0:
 		_check_orphaned_branches()
-	for b in branches:
-		if b.severed:
-			continue
-		var segs = b.get("segments", [])
-		if segs.size() > 0:
-			for seg in segs:
-				apply_wind_seg(seg, delta)
-		else:
-			apply_wind(b, delta)
+
 
 func _check_orphaned_branches():
 	for i in range(branches.size()):
 		var b = branches[i]
 		if b.severed:
 			continue
-		# Check if this branch is still connected to the tree
-		var connected = false
-		# Root joint connects branch to parent
-		var root_jt = b.get("joint")
-		if root_jt and is_instance_valid(root_jt):
-			connected = true
-		# Also check anchor
-		var anchor = b.get("anchor")
-		if anchor and is_instance_valid(anchor):
-			connected = true
-		# Check parent branch - if parent is severed, we are too
-		var parent_idx = b.get("parent_index", -1)
-		if parent_idx >= 0 and parent_idx < branches.size():
-			var parent_b = branches[parent_idx]
-			if parent_b.severed:
-				connected = false
-		if not connected:
+		if not _is_branch_connected(i):
 			prune_branch(i)
 
-func apply_wind_seg(seg, delta):
-	if not is_instance_valid(seg):
-		return
-	var p = seg.global_position * wind_scale
-	var time_offset = time_accum * wind_speed * 5.0
-	var nx = wind_noise.get_noise_3d(p.x, p.y, p.z + time_offset)
-	var nz = wind_noise.get_noise_3d(p.x, p.y + 200.0, p.z + time_offset)
-	var wind = Vector3(nx, 0.0, nz) * wind_strength * capsule_wind_multiplier
-	seg.apply_central_force(wind)
+func _is_branch_connected(branch_idx: int) -> bool:
+	var b = branches[branch_idx]
+	if b.severed:
+		return false
+	# Check all joints in this branch - if the first joint is gone, disconnected
+	var jts = b.get("joints", [])
+	if jts.size() > 0:
+		if not is_instance_valid(jts[0]):
+			return false
+	# Check root joint that connects to parent/trunk
+	var root_jt = b.get("joint")
+	if root_jt and not is_instance_valid(root_jt):
+		return false
+	# Check if parent branch is still connected (recursive)
+	var parent_idx = b.get("parent_index", -1)
+	if parent_idx >= 0 and parent_idx < branches.size():
+		var parent_b = branches[parent_idx]
+		if parent_b.severed:
+			return false
+		# Check if the parent segment we attach to has been released (has gravity)
+		var parent_segs = parent_b.get("segments", [])
+		for seg in parent_segs:
+			if is_instance_valid(seg) and seg.gravity_scale > 0.5:
+				return false
+	return true
 
-func apply_wind(b, delta):
-	if b.severed or not is_instance_valid(b.tip):
-		return
-	var tip: RigidBody3D = b.tip
-	if tip.sleeping:
-		return
-	var p = tip.global_position * wind_scale
-	
-	var time_offset = time_accum * wind_speed * 5.0
-	var nx = wind_noise.get_noise_3d(p.x, p.y, p.z + time_offset)
-	var ny = wind_noise.get_noise_3d(p.x + 100.0, p.y + time_offset, p.z)
-	var nz = wind_noise.get_noise_3d(p.x, p.y + 200.0, p.z + time_offset)
-	
-	var wind = Vector3(nx, ny * 0.3, nz) * wind_strength
-	if collision_shape_type == 0:
-		wind *= capsule_wind_multiplier
-	tip.apply_central_force(wind)
+
 
 func generate_tube_array(path: Array, thicknesses: Array) -> ArrayMesh:
 	if path.size() < 2 or thicknesses.size() < 2:
@@ -826,6 +796,37 @@ func generate_tube_array(path: Array, thicknesses: Array) -> ArrayMesh:
 
 	st.generate_normals()
 	return st.commit()
+
+func _get_wind_shader_code() -> String:
+	return """
+shader_type spatial;
+render_mode cull_disabled;
+
+uniform vec4 albedo_color : source_color = vec4(0.35, 0.22, 0.12, 1.0);
+uniform float wind_strength = 1.5;
+uniform float wind_speed = 0.4;
+uniform float roughness_val = 0.9;
+
+void vertex() {
+	// Wind displacement increases with height (world Y)
+	vec3 world_pos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
+	float height_factor = clamp(world_pos.y * 0.15, 0.0, 1.0);
+	float time = TIME * wind_speed;
+	
+	// Two overlapping sine waves for organic feel
+	float sway_x = sin(time * 1.3 + world_pos.y * 0.5 + world_pos.z * 0.3) * wind_strength * 0.03;
+	float sway_z = sin(time * 0.9 + world_pos.y * 0.7 + world_pos.x * 0.4) * wind_strength * 0.02;
+	
+	// Higher branches sway more
+	VERTEX.x += sway_x * height_factor;
+	VERTEX.z += sway_z * height_factor;
+}
+
+void fragment() {
+	ALBEDO = albedo_color.rgb;
+	ROUGHNESS = roughness_val;
+}
+"""
 
 func generate_tube(path: Array, start_thickness: float, end_thickness: float) -> ArrayMesh:
 	if path.size() < 2:

@@ -2,14 +2,11 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://bi838d53q4iia"
+uid="uid://bpfu40syqhpwq"
 path.s3tc="res://.godot/imported/mini_sierra_texture_pbr_v128_normal.png-7e7469be067f9128386e5c2c5c0eccd4.s3tc.ctex"
 metadata={
 "imported_formats": ["s3tc_bptc"],
 "vram_texture": true
-}
-generator_parameters={
-"md5": "e2a59ab6ae67be4bf6d23cf819370a60"
 }
 
 [deps]
