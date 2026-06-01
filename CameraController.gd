@@ -718,8 +718,8 @@ func frame_tree() -> void:
 		center.z + sin(angle_rad) * standing_dist
 	)
 	
-	# Look directly at the trunk of the tree (height of 1.5m above tree root)
-	var look_target = Vector3(center.x, 1.5, center.z)
+	# Look directly at the trunk of the tree (height of 1.5m at origin)
+	var look_target = Vector3(0.0, 1.5, 0.0)
 	look_at(look_target, Vector3.UP)
 
 func _validate_rule_ui(rule_text: String, status_label: Label) -> void:

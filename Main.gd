@@ -1,4 +1,4 @@
-﻿extends Node3D
+extends Node3D
 
 
 
@@ -157,7 +157,6 @@ func setup_gui():
 	canvas.add_child(score_label)
 
 func setup_vfx_assets():
-	setup_reference_cube()
 
 	leaf_mesh = BoxMesh.new()
 	leaf_mesh.size = Vector3(0.08, 0.08, 0.08)
@@ -367,16 +366,3 @@ func _process(delta: float):
 		is_cutting = false
 		cut_target = null
 		cut_progress = 0.0
-
-func setup_reference_cube():
-	var cube_mi = MeshInstance3D.new()
-	cube_mi.name = "ReferenceCube"
-	var box = BoxMesh.new()
-	box.size = Vector3(1.0, 1.0, 1.0)
-	cube_mi.mesh = box
-	var mat = StandardMaterial3D.new()
-	mat.albedo_color = Color(1.0, 0.2, 0.2, 0.5)
-	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	cube_mi.material_override = mat
-	cube_mi.position = Vector3(2.0, 0.5, 0.0)
-	add_child(cube_mi)
